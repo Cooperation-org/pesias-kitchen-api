@@ -1,2 +1,2 @@
 # pesias-kitchen-api
-Backend service for Global Classrooms - managing environmental education projects, GoodDollar rewards, and cross-community collaboration.
+Backend service for Pesia's Kitchen EAT Initiative - handling food rescue volunteer verification, GoodDollar rewards distribution, and impact tracking.
