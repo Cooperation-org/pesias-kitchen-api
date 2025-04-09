@@ -4,6 +4,9 @@
   "description": "Backend service for Pesia's Kitchen EAT Initiative - handling food rescue volunteer verification, GoodDollar rewards distribution, and impact tracking.",
   "main": "index.js",
   "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "lint": "eslint .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -16,5 +19,23 @@
   "bugs": {
     "url": "https://github.com/Cooperation-org/pesias-kitchen-api/issues"
   },
-  "homepage": "https://github.com/Cooperation-org/pesias-kitchen-api#readme"
+  "homepage": "https://github.com/Cooperation-org/pesias-kitchen-api#readme",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.13.2",
+    "morgan": "^1.10.0",
+    "qrcode": "^1.5.4",
+    "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.24.0",
+    "nodemon": "^3.1.9",
+    "prettier": "^3.5.3"
+  }
 }
