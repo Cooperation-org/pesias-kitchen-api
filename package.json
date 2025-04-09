@@ -1,0 +1,20 @@
+{
+  "name": "pesias-kitchen-api",
+  "version": "1.0.0",
+  "description": "Backend service for Pesia's Kitchen EAT Initiative - handling food rescue volunteer verification, GoodDollar rewards distribution, and impact tracking.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cooperation-org/pesias-kitchen-api.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Cooperation-org/pesias-kitchen-api/issues"
+  },
+  "homepage": "https://github.com/Cooperation-org/pesias-kitchen-api#readme"
+}
