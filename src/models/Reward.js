@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+
 const RewardSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -27,7 +28,7 @@ const RewardSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: ['volunteer', 'recipient', 'donation'],
-    default: 'volunteer'
+    default: 'recipient'
   },
   linkedClaimId: {
     type: String // Reference to the LinkedClaims credential
