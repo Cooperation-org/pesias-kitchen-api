@@ -27,7 +27,7 @@ const UserSchema = new mongoose.Schema({
   role: {
     type: String,
     enum: ['recipient', 'admin', 'volunteer'],
-    default: 'volunteer'
+    default: 'recipient'
   },
   walletAddress: {
     type: String,
@@ -36,7 +36,7 @@ const UserSchema = new mongoose.Schema({
   phoneNumber: {
     type: String,
     match: [/^\+?[1-9]\d{9,14}$/, 'Please enter a valid phone number'],
-    sparse: true // This allows the field to be optional but unique if provided
+    sparse: true 
   },
   profileImage: {
     type: String
@@ -54,7 +54,7 @@ const UserSchema = new mongoose.Schema({
     default: 0
   },
   linkedClaimsIds: [{
-    type: String // Store LinkedClaims credential IDs only
+    type: String 
   }],
   createdAt: {
     type: Date,
@@ -62,22 +62,31 @@ const UserSchema = new mongoose.Schema({
   }
 });
 
-// Hash password before saving
+
 UserSchema.pre('save', async function(next) {
   if (!this.isModified('password')) {
-    next();
+    return next();
   }
   
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  try {
+    const salt = await bcrypt.genSalt(10);
+    
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
-// Compare passwords
 UserSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  try {
+    const isMatch = await bcrypt.compare(enteredPassword, this.password);    
+    return isMatch;
+  } catch (error) {
+    console.error('Error comparing passwords:', error);
+    throw error;
+  }
 };
-
-// Sign JWT and return
 UserSchema.methods.getSignedJwtToken = function() {
   return jwt.sign(
     { id: this._id, role: this.role },
