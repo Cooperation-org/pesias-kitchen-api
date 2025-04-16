@@ -1,54 +1,90 @@
-// src/controllers/activityController.js
 const Activity = require('../models/Activity');
 const User = require('../models/User');
-const Reward = require('../models/Reward');
-const qrCodeService = require('../services/qrCodeService');
-const goodDollarService = require('../services/goodDollarService');
-const linkedClaimsService = require('../services/linkedClaimsService');
+const Participation = require('../models/Participation');
+const goodCollectiveService = require('../services/goodCollectiveService');
+const crypto = require('crypto');
 
-// Create a new activity
-exports.createActivity = async (req, res) => {
+// Create new activity
+const createActivity = async (req, res) => {
   try {
-    const { title, description, location, date, endDate, metrics } = req.body;
-
-    // Generate QR code
-    const { qrCodeDataUrl, token } = await qrCodeService.generateActivityQR(Date.now().toString());
-
+    const { 
+      title, description, location, date, endDate, 
+      expectedFoodAmount, expectedPeopleServed 
+    } = req.body;
+    
+    // Find user by wallet address
+    const user = await User.findOne({ walletAddress: req.body.walletAddress });
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    // Generate token for QR code
+    const token = crypto.randomBytes(16).toString('hex');
+    
+    // Create activity
     const activity = await Activity.create({
       title,
       description,
       location,
-      date: new Date(date),
-      endDate: endDate ? new Date(endDate) : null,
-      metrics,
-      qrCode: qrCodeDataUrl,
-      qrToken: token,
-      createdBy: req.user.id
+      date,
+      endDate,
+      token,
+      status: 'planned',
+      metrics: {
+        foodAmount: expectedFoodAmount || 0,
+        peopleServed: expectedPeopleServed || 0,
+        mealCount: 0,
+        volunteerHours: 0
+      },
+      createdBy: user._id
     });
-
-    // Update user's created activities
-    await User.findByIdAndUpdate(req.user.id, {
-      $push: { activitiesCreated: activity._id }
-    });
-
+    
+    // Add to user's created activities
+    user.activitiesCreated.push(activity._id);
+    await user.save();
+    
+    // Create GoodCollective pool if integration is available
+    try {
+      const poolData = await goodCollectiveService.createPool(
+        activity.title,
+        {
+          studentReward: 5, // G$ reward amount
+          volunteerReward: 5, // G$ reward amount
+          recipientReward: 2 // G$ reward amount
+        }
+      );
+      
+      // Update activity with GoodCollective info
+      activity.goodCollectivePoolId = poolData.poolId;
+      activity.goodCollectiveStatus = 'active';
+      await activity.save();
+    } catch (error) {
+      console.error('GoodCollective pool creation error:', error);
+      // Continue even if GoodCollective integration fails
+    }
+    
     res.status(201).json({
       success: true,
       data: activity
     });
   } catch (error) {
-    console.error('Error creating activity:', error);
+    console.error('Activity creation error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Failed to create activity'
     });
   }
 };
 
 // Get all activities
-exports.getActivities = async (req, res) => {
+const getActivities = async (req, res) => {
   try {
     const activities = await Activity.find()
-      .populate('createdBy', 'name email')
+      .populate('createdBy', 'name walletAddress')
       .sort('-date');
     
     res.status(200).json({
@@ -57,19 +93,20 @@ exports.getActivities = async (req, res) => {
       data: activities
     });
   } catch (error) {
+    console.error('Get activities error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Failed to get activities'
     });
   }
 };
 
 // Get single activity
-exports.getActivity = async (req, res) => {
+const getActivity = async (req, res) => {
   try {
     const activity = await Activity.findById(req.params.id)
-      .populate('createdBy', 'name email')
-      .populate('participants.user', 'name email');
+      .populate('createdBy', 'name walletAddress')
+      .populate('participants.user', 'name walletAddress');
     
     if (!activity) {
       return res.status(404).json({
@@ -83,20 +120,31 @@ exports.getActivity = async (req, res) => {
       data: activity
     });
   } catch (error) {
+    console.error('Get activity error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Failed to get activity'
     });
   }
 };
 
-// Join an activity
-exports.joinActivity = async (req, res) => {
+// Update activity status
+const updateActivityStatus = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { role = 'volunteer' } = req.body;
+    const { status } = req.body;
     
-    const activity = await Activity.findById(id);
+    if (!['planned', 'active', 'completed', 'cancelled'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status'
+      });
+    }
+    
+    const activity = await Activity.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    );
     
     if (!activity) {
       return res.status(404).json({
@@ -104,201 +152,28 @@ exports.joinActivity = async (req, res) => {
         message: 'Activity not found'
       });
     }
-    
-    // Check if user already joined
-    const alreadyJoined = activity.participants.some(
-      participant => participant.user.toString() === req.user.id
-    );
-    
-    if (alreadyJoined) {
-      return res.status(400).json({
-        success: false,
-        message: 'You have already joined this activity'
-      });
-    }
-    
-    // Add user to participants
-    activity.participants.push({
-      user: req.user.id,
-      role,
-      verified: false
-    });
-    
-    await activity.save();
-    
-    // Add activity to user's joined activities
-    await User.findByIdAndUpdate(req.user.id, {
-      $push: { activitiesJoined: activity._id }
-    });
-    
-    res.status(200).json({
-      success: true,
-      message: `Successfully joined activity as ${role}`
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-// Verify participation with QR code
-exports.verifyParticipation = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { qrData } = req.body;
-    
-    const activity = await Activity.findById(id).select('+qrToken');
-    
-    if (!activity) {
-      return res.status(404).json({
-        success: false,
-        message: 'Activity not found'
-      });
-    }
-    
-    // Validate QR code
-    const isValid = qrCodeService.validateQRData(qrData, activity.qrToken);
-    
-    if (!isValid) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid QR code'
-      });
-    }
-    
-    // Find participant index
-    const participantIndex = activity.participants.findIndex(
-      p => p.user.toString() === req.user.id
-    );
-    
-    if (participantIndex === -1) {
-      return res.status(400).json({
-        success: false,
-        message: 'You are not registered for this activity'
-      });
-    }
-    
-    // Update participant status
-    activity.participants[participantIndex].verified = true;
-    activity.participants[participantIndex].verifiedAt = Date.now();
-    
-    // Get user details
-    const user = await User.findById(req.user.id);
-    
-    // Create LinkedClaims credential
-    const role = activity.participants[participantIndex].role;
-    const credential = await linkedClaimsService.createActivityCredential(
-      activity,
-      user,
-      role
-    );
-    
-    // Store credential ID
-    activity.participants[participantIndex].linkedClaimId = credential.id;
-    await activity.save();
-    
-    // Add credential to user
-    await User.findByIdAndUpdate(user._id, {
-      $push: { linkedClaimsIds: credential.id }
-    });
-    
-    // Process reward if user has wallet
-    if (user.walletAddress) {
-      // Calculate reward amount based on role and activity
-      const rewardAmount = role === 'volunteer' ? 10 : 5; // Example logic
-      
-      // Send reward
-      const transaction = await goodDollarService.sendReward(
-        user.walletAddress,
-        rewardAmount,
-        activity._id
-      );
-      
-      // Update participant reward info
-      activity.participants[participantIndex].rewarded = true;
-      activity.participants[participantIndex].rewardAmount = rewardAmount;
-      activity.participants[participantIndex].transactionHash = transaction.hash;
-      await activity.save();
-      
-      // Create reward record
-      await Reward.create({
-        user: user._id,
-        activity: activity._id,
-        amount: rewardAmount,
-        transactionHash: transaction.hash,
-        type: role,
-        linkedClaimId: credential.id,
-        status: 'completed'
-      });
-      
-      // Update user's total rewards
-      await User.findByIdAndUpdate(user._id, {
-        $inc: { totalRewardsEarned: rewardAmount }
-      });
-    }
-    
-    res.status(200).json({
-      success: true,
-      message: 'Participation verified and rewarded',
-      data: {
-        credentialId: credential.id,
-        walletUpdated: !!user.walletAddress
-      }
-    });
-  } catch (error) {
-    console.error('Error verifying participation:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-// Update activity
-exports.updateActivity = async (req, res) => {
-  try {
-    const { id } = req.params;
-    let activity = await Activity.findById(id);
-    
-    if (!activity) {
-      return res.status(404).json({
-        success: false,
-        message: 'Activity not found'
-      });
-    }
-    
-    // Check if user is authorized
-    if (activity.createdBy.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized to update this activity'
-      });
-    }
-    
-    activity = await Activity.findByIdAndUpdate(id, req.body, {
-      new: true,
-      runValidators: true
-    });
     
     res.status(200).json({
       success: true,
       data: activity
     });
   } catch (error) {
+    console.error('Update activity status error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Failed to update activity status'
     });
   }
 };
 
-// Delete activity
-exports.deleteActivity = async (req, res) => {
+// Complete activity and update metrics
+const completeActivity = async (req, res) => {
   try {
-    const { id } = req.params;
-    const activity = await Activity.findById(id);
+    const { 
+      foodAmount, peopleServed, mealCount, volunteerHours 
+    } = req.body;
+    
+    const activity = await Activity.findById(req.params.id);
     
     if (!activity) {
       return res.status(404).json({
@@ -307,38 +182,64 @@ exports.deleteActivity = async (req, res) => {
       });
     }
     
-    // Check if user is authorized
-    if (activity.createdBy.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized to delete this activity'
-      });
+    // Update activity with metrics and mark as completed
+    activity.status = 'completed';
+    activity.metrics = {
+      foodAmount: foodAmount || activity.metrics.foodAmount,
+      peopleServed: peopleServed || activity.metrics.peopleServed,
+      mealCount: mealCount || activity.metrics.mealCount,
+      volunteerHours: volunteerHours || activity.metrics.volunteerHours
+    };
+    
+    await activity.save();
+    
+    // Track impact in GoodCollective if integration is available
+    try {
+      await goodCollectiveService.trackImpact(activity._id, activity.metrics);
+    } catch (error) {
+      console.error('GoodCollective impact tracking error:', error);
+      // Continue even if GoodCollective integration fails
     }
-    
-    await activity.remove();
-    
-    // Remove activity from users
-    await User.updateMany(
-      { $or: [
-        { activitiesCreated: activity._id },
-        { activitiesJoined: activity._id }
-      ]},
-      { 
-        $pull: { 
-          activitiesCreated: activity._id,
-          activitiesJoined: activity._id
-        }
-      }
-    );
     
     res.status(200).json({
       success: true,
-      data: {}
+      data: activity
     });
   } catch (error) {
+    console.error('Complete activity error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Failed to complete activity'
     });
   }
+};
+
+// Get participants for an activity
+const getActivityParticipants = async (req, res) => {
+  try {
+    const participations = await Participation.find({ activity: req.params.id })
+      .populate('user', 'name walletAddress')
+      .sort('-verifiedAt');
+    
+    res.status(200).json({
+      success: true,
+      count: participations.length,
+      data: participations
+    });
+  } catch (error) {
+    console.error('Get activity participants error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to get activity participants'
+    });
+  }
+};
+
+module.exports = {
+  createActivity,
+  getActivities,
+  getActivity,
+  updateActivityStatus,
+  completeActivity,
+  getActivityParticipants
 };
