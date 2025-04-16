@@ -1,6 +1,4 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 
 const UserSchema = new mongoose.Schema({
   name: {
@@ -9,29 +7,30 @@ const UserSchema = new mongoose.Schema({
     trim: true,
     maxlength: [50, 'Name cannot be more than 50 characters']
   },
+  // Remove email and password requirements
   email: {
     type: String,
-    required: [true, 'Please provide an email'],
-    unique: true,
+    sparse: true,
     match: [
       /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
       'Please provide a valid email'
     ]
   },
-  password: {
+  walletAddress: {
     type: String,
-    required: [true, 'Please provide a password'],
-    minlength: [6, 'Password must be at least 6 characters'],
-    select: false
+    unique: true,
+    sparse: true
+  },
+  goodDollarInfo: {
+    fullName: String,
+    email: String,
+    mobile: String,
+    location: String
   },
   role: {
     type: String,
-    enum: ['recipient', 'admin', 'volunteer'],
-    default: 'recipient'
-  },
-  walletAddress: {
-    type: String,
-    default: ''
+    enum: ['student', 'volunteer', 'recipient', 'admin'],
+    default: 'student'
   },
   phoneNumber: {
     type: String,
@@ -61,38 +60,5 @@ const UserSchema = new mongoose.Schema({
     default: Date.now
   }
 });
-
-
-UserSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) {
-    return next();
-  }
-  
-  try {
-    const salt = await bcrypt.genSalt(10);
-    
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
-
-UserSchema.methods.matchPassword = async function(enteredPassword) {
-  try {
-    const isMatch = await bcrypt.compare(enteredPassword, this.password);    
-    return isMatch;
-  } catch (error) {
-    console.error('Error comparing passwords:', error);
-    throw error;
-  }
-};
-UserSchema.methods.getSignedJwtToken = function() {
-  return jwt.sign(
-    { id: this._id, role: this.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
-  );
-};
 
 module.exports = mongoose.model('User', UserSchema);

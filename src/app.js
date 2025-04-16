@@ -13,12 +13,11 @@ app.use(morgan('dev'));
 
 require('./config/database');
 
-
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/users', require('./routes/userRoutes'));
+// Routes
+app.use('/api/auth', require('./routes/goodDollarAuthRoutes'));
 app.use('/api/activities', require('./routes/activityRoutes'));
-app.use('/api/rewards', require('./routes/rewardRoutes'));
-
+app.use('/api/qr', require('./routes/qrRoutes'));
+app.use('/api/participations', require('./routes/participationRoutes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

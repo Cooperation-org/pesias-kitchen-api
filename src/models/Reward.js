@@ -1,10 +1,12 @@
 const mongoose = require('mongoose');
 
-
 const RewardSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'User'
+  },
+  walletAddress: {
+    type: String,
     required: true
   },
   activity: {
@@ -17,8 +19,7 @@ const RewardSchema = new mongoose.Schema({
     required: [true, 'Please provide a reward amount']
   },
   transactionHash: {
-    type: String,
-    required: [true, 'Transaction hash is required']
+    type: String
   },
   status: {
     type: String,
@@ -27,8 +28,11 @@ const RewardSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['volunteer', 'recipient', 'donation'],
-    default: 'recipient'
+    enum: ['student', 'volunteer', 'recipient', 'donation'],
+    default: 'student'
+  },
+  goodDollarTransactionId: {
+    type: String
   },
   linkedClaimId: {
     type: String // Reference to the LinkedClaims credential
@@ -40,6 +44,7 @@ const RewardSchema = new mongoose.Schema({
 });
 
 // Create index for faster queries
+RewardSchema.index({ walletAddress: 1, activity: 1 });
 RewardSchema.index({ user: 1, activity: 1 });
 
 module.exports = mongoose.model('Reward', RewardSchema);

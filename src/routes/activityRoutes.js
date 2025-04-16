@@ -3,28 +3,18 @@ const {
   createActivity,
   getActivities,
   getActivity,
-  updateActivity,
-  deleteActivity,
-  joinActivity,
-  verifyParticipation
+  updateActivityStatus,
+  completeActivity,
+  getActivityParticipants
 } = require('../controllers/activityController');
-const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
-router.route('/')
-  .get(getActivities)
-  .post(protect, authorize('admin', 'volunteer'), createActivity);
-
-router.route('/:id')
-  .get(getActivity)
-  .put(protect, updateActivity)
-  .delete(protect, deleteActivity);
-
-router.route('/:id/join')
-  .post(protect, joinActivity);
-
-router.route('/:id/verify')
-  .post(protect, verifyParticipation);
+router.post('/', createActivity);
+router.get('/', getActivities);
+router.get('/:id', getActivity);
+router.put('/:id/status', updateActivityStatus);
+router.put('/:id/complete', completeActivity);
+router.get('/:id/participants', getActivityParticipants);
 
 module.exports = router;

@@ -31,9 +31,9 @@ const ActivitySchema = new mongoose.Schema({
   qrCode: {
     type: String  // Store the QR code data or URL
   },
-  qrToken: {
+  token: {
     type: String, // Store a verification token for QR validation
-    select: false // Don't return this in standard queries
+    unique: true
   },
   metrics: {
     foodAmount: {
@@ -59,10 +59,13 @@ const ActivitySchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
       },
+      walletAddress: {
+        type: String
+      },
       role: {
         type: String,
-        enum: ['volunteer', 'recipient'],
-        default: 'volunteer'
+        enum: ['student', 'volunteer', 'recipient'],
+        default: 'student'
       },
       verified: {
         type: Boolean,
@@ -91,6 +94,15 @@ const ActivitySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+  // Add GoodCollective fields
+  goodCollectivePoolId: {
+    type: String
+  },
+  goodCollectiveStatus: {
+    type: String,
+    enum: ['pending', 'active', 'completed'],
+    default: 'pending'
   },
   nftMinted: {
     type: Boolean,
