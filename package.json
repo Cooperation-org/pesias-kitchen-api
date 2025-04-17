@@ -25,6 +25,7 @@
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
+    "ethers": "^6.13.5",
     "express": "^5.1.0",
     "express-validator": "^7.2.1",
     "helmet": "^8.1.0",
@@ -32,6 +33,7 @@
     "mongoose": "^8.13.2",
     "morgan": "^1.10.0",
     "qrcode": "^1.5.4",
+    "wagmi": "^2.14.16",
     "winston": "^3.17.0"
   },
   "devDependencies": {
