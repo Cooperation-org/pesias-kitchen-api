@@ -1,112 +1,103 @@
 const User = require('../models/User');
-const goodDollarService = require('../services/goodDollarService');
 
 // Get current user profile
-const  getMe = async (req, res) => {
+exports.getCurrentUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id)
-      .populate('activitiesJoined')
-      .populate('activitiesCreated');
+    const user = await User.findById(req.user.userId)
+      .select('-nonce') // Exclude sensitive fields
+      .populate('activities');
     
-    res.status(200).json({
-      success: true,
-      data: user
-    });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.status(200).json(user);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
 // Update user profile
-const updateProfile = async (req, res) => {
+exports.updateProfile = async (req, res) => {
   try {
-    const { name, email, phoneNumber, profileImage } = req.body;
+    const { name } = req.body;
+    
+    // Only allow updating specific fields
+    const updates = {};
+    if (name) updates.name = name;
     
     const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { name, email, phoneNumber, profileImage },
-      { new: true, runValidators: true }
-    );
+      req.user.userId,
+      { $set: updates },
+      { new: true }
+    ).select('-nonce');
     
-    res.status(200).json({
-      success: true,
-      data: user
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-// Connect wallet
-const connectWallet = async (req, res) => {
-  try {
-    const { walletAddress } = req.body;
-    
-    if (!walletAddress) {
-      return res.status(400).json({
-        success: false,
-        message: 'Wallet address is required'
-      });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
     
-    // Update user with wallet address
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { walletAddress },
-      { new: true }
-    );
-    
-    res.status(200).json({
-      success: true,
-      data: user
-    });
+    res.status(200).json(user);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    console.error('Error updating profile:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
-// Create new wallet
-const createWallet = async (req, res) => {
+// Get all users (admin only)
+exports.getAllUsers = async (req, res) => {
   try {
-    // Use GoodDollar service to create a wallet
-    const wallet = await goodDollarService.createWallet();
+    const users = await User.find()
+      .select('-nonce')
+      .sort({ createdAt: -1 });
     
-    // Update user with new wallet address
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { walletAddress: wallet.address },
-      { new: true }
-    );
-    
-    res.status(200).json({
-      success: true,
-      data: {
-        user,
-        wallet: {
-          address: wallet.address
-        }
-      }
-    });
+    res.status(200).json(users);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    console.error('Error fetching users:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
-module.exports = {
-  getMe,
-  updateProfile,
-  connectWallet,
-  createWallet
+// Get user by ID (admin only)
+exports.getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId)
+      .select('-nonce')
+      .populate('activities');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.status(200).json(user);
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Update user role (admin only)
+exports.updateUserRole = async (req, res) => {
+  try {
+    const { role } = req.body;
+    
+    if (!role || !['volunteer', 'recipient', 'admin'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+    
+    const user = await User.findByIdAndUpdate(
+      req.params.userId,
+      { $set: { role } },
+      { new: true }
+    ).select('-nonce');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.status(200).json(user);
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 };

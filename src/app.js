@@ -1,32 +1,75 @@
+// src/app.js
+require('dotenv').config();
+const connectDB = require('./config/database');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const morgan = require('morgan');
+
+// Routes
+const authRoutes = require('./routes/auth');
+const qrCodeRoutes = require('./routes/qrCode');
+const activityRoutes = require('./routes/activity');
+const userRoutes = require('./routes/user');
+const eventRoutes = require('./routes/event');
+
+// dotenv.config();
 
 const app = express();
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cors());
+// Middleware
 app.use(helmet());
-app.use(morgan('dev'));
+app.use(cors());
+app.use(express.json());
 
-require('./config/database');
+// Connect to MongoDB
+// mongoose.connect(process.env.MONGODB_URI)
+//   .then(() => console.log('Connected to MongoDB'))
+//   .catch(err => console.error('MongoDB connection error:', err));
 
+connectDB()
+  .then(() => {
+    console.log('MongoDB connected');
+    
+    // Only start the server after DB connection succeeds
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error('Could not connect to MongoDB:', err);
+    process.exit(1);
+  });
 
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/users', require('./routes/userRoutes'));
-app.use('/api/activities', require('./routes/activityRoutes'));
-app.use('/api/rewards', require('./routes/rewardRoutes'));
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/qr', qrCodeRoutes);
+app.use('/api/activity', activityRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/event', eventRoutes);
 
-
+// Add this before your other routes
+// Add to your test route
+app.get('/api/test', (req, res) => {
+  console.log('Test endpoint hit');
+  try {
+    res.json({ message: 'Backend API is running!' });
+    console.log('Response sent successfully');
+  } catch (err) {
+    console.error('Error sending response:', err);
+    res.status(500).send('Error');
+  }
+});
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({
-    status: 'error',
-    message: 'Something went wrong!'
-  });
+  res.status(500).json({ message: 'Internal Server Error' });
 });
 
-module.exports = app;
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+
+
