@@ -1,140 +1,73 @@
-const User = require('../models/User'); 
-const jwt = require('jsonwebtoken'); 
-const bcrypt = require('bcryptjs');
+// src/controllers/authController.js
+const User = require('../models/User');
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
+const { verifySignature } = require('../utils/web3');
 
-
-const register = async (req, res) => {
+exports.getNonce = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
-
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide name, email and password'
-      });
-    }
-
-    const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email already in use'
-      });
-    }
-
-    const user = await User.create({
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      password: password.trim() 
-    });
-
-    res.status(201).json({
-      success: true,
-      data: {
-        id: user._id,
-        name: user.name,
-        email: user.email
-      }
-    });
-
-  } catch (err) {
-    console.error('Registration error:', err);
-    res.status(500).json({
-      success: false,
-      message: err.message || 'Registration failed'
-    });
-  }
-};
-
-const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide email and password'
-      });
-    }
-
-    const user = await User.findOne({ 
-      email: email.toLowerCase().trim() 
-    }).select('+password');
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
-
-    const isMatch = await bcrypt.compare(password.trim(), user.password);
-  
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
-
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
-    );
-
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email
-      }
-    });
-
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Authentication failed'
-    });
-  }
-};
-
-const getMe = async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
+    const { walletAddress } = req.body;
     
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+    if (!walletAddress) {
+      return res.status(400).json({ message: 'Wallet address is required' });
     }
     
-    res.status(200).json({
-      success: true,
-      data: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        walletAddress: user.walletAddress,
-        createdAt: user.createdAt
-      }
-    });
+    let user = await User.findOne({ walletAddress: walletAddress.toLowerCase() });
+    
+    // If user doesn't exist, create one
+    if (!user) {
+      user = new User({
+        walletAddress: walletAddress.toLowerCase(),
+        nonce: uuidv4(),
+      });
+      await user.save();
+    } else {
+      // Update the nonce for existing user
+      user.nonce = uuidv4();
+      await user.save();
+    }
+    
+    res.status(200).json({ nonce: user.nonce });
   } catch (error) {
-    console.error('GetMe error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'An error occurred while retrieving user profile'
-    });
+    console.error('Error in getNonce:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
-module.exports = {
-  register,
-  login,
-  getMe
+exports.verifySignature = async (req, res) => {
+  try {
+    const { walletAddress, signature } = req.body;
+    
+    if (!walletAddress || !signature) {
+      return res.status(400).json({ message: 'Wallet address and signature are required' });
+    }
+    
+    const user = await User.findOne({ walletAddress: walletAddress.toLowerCase() });
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    const isValid = await verifySignature(walletAddress, user.nonce, signature);
+    
+    if (!isValid) {
+      return res.status(401).json({ message: 'Invalid signature' });
+    }
+    
+    // Generate a new nonce for next login
+    user.nonce = uuidv4();
+    await user.save();
+    
+    // Create and sign a JWT token
+    const token = jwt.sign(
+      { userId: user._id, walletAddress: user.walletAddress, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+    
+    res.status(200).json({ token, user: { id: user._id, walletAddress: user.walletAddress, role: user.role } });
+  } catch (error) {
+    console.error('Error in verifySignature:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 };
