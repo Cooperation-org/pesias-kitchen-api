@@ -11,6 +11,10 @@ const qrCodeRoutes = require('./routes/qrCode');
 const activityRoutes = require('./routes/activity');
 const userRoutes = require('./routes/user');
 const eventRoutes = require('./routes/event');
+const poolRoutes = require('./routes/pool');
+const nftRoutes = require('./routes/nft');
+
+
 
 // dotenv.config();
 
@@ -47,6 +51,10 @@ app.use('/api/qr', qrCodeRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/event', eventRoutes);
+app.use('/api/pool', poolRoutes);
+app.use('/api/nft', nftRoutes);
+
+
 
 // Add this before your other routes
 // Add to your test route
