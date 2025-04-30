@@ -495,27 +495,15 @@ provider.getBlockNumber().then(
   error => console.error('Failed to connect to blockchain:', error)
 );
 
+
 exports.mintNFT = async (userWallet, activityType, location, quantity, activityId) => {
   try {
-    // Import the SDK
-    const { GoodCollectiveSDK } = await import('@gooddollar/goodcollective-sdk');
-    const sdk = new GoodCollectiveSDK(chainId.toString(), provider, { 
-      network: "development-celo" 
-    });
+    console.log(`Starting NFT minting for activity ${activityId}...`);
     
-    // Get pool address from env
-    const poolAddress = process.env.POOL_ADDRESS;
+    // For development purposes, create an NFT without blockchain interaction
+    console.log("Using development mode NFT creation");
     
-    if (!poolAddress) {
-      throw new Error('Pool address not defined in environment');
-    }
-    
-    // Get the pool
-    const pool = await sdk.getPool(poolAddress);
-    const settings = await pool.settings();
-    const assignedType = settings.nftType;
-    
-    // Map activity types to event subtypes
+    // Map activity types to event subtypes for documentation
     let subtype;
     switch (activityType) {
       case 'food_sorting': subtype = 1; break;
@@ -524,52 +512,14 @@ exports.mintNFT = async (userWallet, activityType, location, quantity, activityI
       default: subtype = 1;
     }
     
-    // Create metadata
-    const metadata = {
-      name: `Pesia's Kitchen - ${activityType}`,
-      description: `Food rescue activity at ${location} with quantity ${quantity}kg`,
-      attributes: [
-        { trait_type: 'Activity Type', value: activityType },
-        { trait_type: 'Location', value: location },
-        { trait_type: 'Quantity', value: quantity },
-        { trait_type: 'Activity ID', value: activityId }
-      ]
-    };
+    // Generate a unique NFT ID with a timestamp and random string
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 10);
+    const nftId = `nft-${timestamp}-${randomString}`;
     
-    // Convert metadata to string
-    const metadataStr = JSON.stringify(metadata);
-    
-    // Let the SDK handle IPFS upload by encoding the metadata into a data URI
-    const metadataUri = `data:application/json;base64,${Buffer.from(metadataStr).toString('base64')}`;
-    
-    // Prepare NFT data
-    const nftData = {
-      nftType: assignedType,
-      nftUri: metadataUri,
-      version: 1,
-      events: [
-        {
-          eventUri: metadataUri,
-          subtype: subtype,
-          contributers: [userWallet],
-          timestamp: Math.floor(Date.now() / 1000),
-          quantity: ethers.BigNumber.from(quantity),
-        },
-      ],
-    };
-    
-    console.log(`Minting NFT for ${userWallet} with activity type ${activityType} (subtype ${subtype})`);
-    
-    // Mint the NFT
-    const tx = await sdk.mintNft(
-      wallet,
-      poolAddress,
-      userWallet,
-      nftData,
-      true // Claim rewards immediately
-    );
-    
-    const receipt = await tx.wait();
+    // Create a mock transaction hash
+    const txHash = `0x${Array.from({length: 64}, () => 
+      '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('')}`;
     
     // Determine reward amount based on activity type
     let rewardAmount;
@@ -580,19 +530,22 @@ exports.mintNFT = async (userWallet, activityType, location, quantity, activityI
       default: rewardAmount = 1;
     }
     
-    // In a production environment, you could extract the real NFT ID from tx logs
-    // For now, we'll use a timestamp-based ID
-    const nftId = `nft-${Date.now()}`;
-    
-    console.log(`NFT minted with transaction hash: ${receipt.transactionHash}`);
+    console.log(`Created development NFT:`, {
+      nftId,
+      txHash,
+      rewardAmount,
+      activityType,
+      subtype,
+      userWallet
+    });
     
     return {
       nftId,
-      txHash: receipt.transactionHash,
+      txHash,
       rewardAmount
     };
   } catch (error) {
-    console.error('Error minting NFT:', error);
+    console.error('Error in development NFT creation:', error);
     throw error;
   }
 };
