@@ -13,6 +13,8 @@ const userRoutes = require('./routes/user');
 const eventRoutes = require('./routes/event');
 const poolRoutes = require('./routes/pool');
 const nftRoutes = require('./routes/nft');
+const rewardsRoutes = require('./routes/rewards');
+
 
 
 
@@ -53,6 +55,9 @@ app.use('/api/user', userRoutes);
 app.use('/api/event', eventRoutes);
 app.use('/api/pool', poolRoutes);
 app.use('/api/nft', nftRoutes);
+app.use('/api/rewards', rewardsRoutes);
+
+
 
 
 
