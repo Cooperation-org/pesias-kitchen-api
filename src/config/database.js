@@ -1,30 +1,56 @@
 const mongoose = require('mongoose');
-const logger = require('../utils/logger');
+const crypto = require('crypto');
+const tls = require('tls');
+require('dotenv').config();
+
+mongoose.set('strictQuery', false);
 
 const connectDB = async () => {
-  const MONGODB_URI = process.env.MONGODB_URI;
-
   try {
-    await mongoose.connect(MONGODB_URI, {
+    const secureContext = tls.createSecureContext({
+      secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT
+    });
+    
+    const MONGODB_URI = process.env.MONGODB_URI
+    
+    const conn = await mongoose.connect(MONGODB_URI, {
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 45000,
       connectTimeoutMS: 30000,
-      maxPoolSize: 10,
-      retryWrites: true,
-      retryReads: true,
-      appName: "PesiasKitchenAPI"
+      heartbeatFrequencyMS: 10000,
+      maxPoolSize: 50,        
+      minPoolSize: 5,        
+      family: 4,            
+      tls: true,
+      secureContext: secureContext
     });
-
-    logger.info(`MongoDB connected: ${mongoose.connection.host}`);
     
-    await mongoose.connection.db.command({ ping: 1 });
-  } catch (err) {
-    logger.error(`MongoDB connection failed: ${err.message}`);
-    process.exit(1);
+    
+    mongoose.connection.on('disconnected', () => {
+      console.log('MongoDB disconnected - attempting to reconnect...');
+    });
+    
+    mongoose.connection.on('error', (err) => {
+      console.error(`MongoDB connection error: ${err.message}`);
+    
+      setTimeout(() => {
+        console.log('Attempting to reconnect after connection error...');
+        mongoose.connect(MONGODB_URI);
+      }, 5000);
+    });
+    
+    return conn;
+  } catch (error) {
+    console.error(`Failed to connect to MongoDB: ${error.message}`);
+    
+    if (error.cause) {
+      console.error(`Underlying error: ${error.cause.message}`);
+    }
+    
+ 
+    setTimeout(() => connectDB(), 10000);
+    return null;
   }
 };
-
-mongoose.connection.on('disconnected', () => logger.warn('MongoDB disconnected'));
-mongoose.connection.on('error', (err) => logger.error(`MongoDB error: ${err.message}`));
 
 module.exports = connectDB;
