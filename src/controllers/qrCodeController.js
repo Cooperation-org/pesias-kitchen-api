@@ -132,6 +132,18 @@ exports.verifyQRAndMintNFT = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
     
+    // Check if user has already participated in this event
+    const existingActivity = await Activity.findOne({
+      user: req.user.userId,
+      event: parsedData.eventId
+    });
+    
+    if (existingActivity) {
+      return res.status(400).json({ 
+        message: 'You have already participated in this event and received rewards'
+      });
+    }
+    
     const qrCode = await QRCode.findOne({
       event: parsedData.eventId,
       isActive: true,
@@ -145,7 +157,6 @@ exports.verifyQRAndMintNFT = async (req, res) => {
     qrCode.usedCount += 1;
     await qrCode.save();
     
-  
     const activityReq = {
       body: {
         eventId: event._id,
@@ -175,7 +186,6 @@ exports.verifyQRAndMintNFT = async (req, res) => {
     
     const newActivity = activityRes.data.activity;
     
- 
     const nftReq = {
       params: {
         activityId: newActivity._id
@@ -199,6 +209,12 @@ exports.verifyQRAndMintNFT = async (req, res) => {
     if (nftRes.statusCode !== 200) {
       return res.status(nftRes.statusCode).json(nftRes.data);
     }
+    
+    // Update user's activities array to include this activity
+    await User.findByIdAndUpdate(
+      req.user.userId,
+      { $addToSet: { activities: newActivity._id } }
+    );
     
     res.status(200).json({
       message: 'QR code verified, activity recorded, and NFT minted successfully',
