@@ -14,7 +14,6 @@ exports.recordActivity = async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields' });
     }
     
-    // Find the event and QR code
     const event = await Event.findById(eventId);
     const qrCode = await QRCode.findById(qrCodeId);
     
@@ -26,7 +25,6 @@ exports.recordActivity = async (req, res) => {
       return res.status(404).json({ message: 'QR code not found' });
     }
     
-    // Create new activity record
     const newActivity = new Activity({
       event: event._id,
       qrCode: qrCode._id,
@@ -37,7 +35,6 @@ exports.recordActivity = async (req, res) => {
     
     await newActivity.save();
     
-    // Add activity to user's activities
     await User.findByIdAndUpdate(
       req.user.userId,
       { $push: { activities: newActivity._id } }
@@ -52,6 +49,7 @@ exports.recordActivity = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
 
 exports.mintActivityNFT = async (req, res) => {
   try {
@@ -75,6 +73,8 @@ exports.mintActivityNFT = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
+    console.log(`Minting real NFT for wallet: ${user.walletAddress}`);
+    
     // Mint NFT using GoodDollar service
     const nftResult = await goodDollarService.mintNFT(
       user.walletAddress,
@@ -86,18 +86,25 @@ exports.mintActivityNFT = async (req, res) => {
     
     // Update activity with NFT ID
     activity.nftId = nftResult.nftId;
+    activity.txHash = nftResult.txHash;
     activity.verified = true;
     await activity.save();
     
     res.status(200).json({
-      message: 'NFT minted successfully and G$ rewards claimed',
+      message: 'NFT minted successfully and G$ rewards claimed via blockchain',
       nftId: nftResult.nftId,
       txHash: nftResult.txHash,
-      rewardAmount: nftResult.rewardAmount || '~'
+      rewardAmount: nftResult.rewardAmount
     });
   } catch (error) {
     console.error('Error minting NFT:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    
+    // Return a detailed error message for debugging
+    res.status(500).json({ 
+      message: 'Blockchain transaction failed',
+      error: error.message,
+      details: error.toString()
+    });
   }
 };
 
