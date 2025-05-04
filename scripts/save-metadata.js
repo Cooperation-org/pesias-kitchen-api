@@ -1,4 +1,3 @@
-// save-metadata.js
 const fs = require('fs').promises;
 
 async function saveMetadata() {
@@ -12,7 +11,6 @@ async function saveMetadata() {
   };
   
   await fs.writeFile('pool-metadata.json', JSON.stringify(poolAttributes, null, 2));
-  console.log('Pool metadata saved to pool-metadata.json');
 }
 
 saveMetadata().catch(console.error);

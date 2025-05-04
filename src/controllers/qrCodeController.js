@@ -3,6 +3,8 @@ const Event = require('../models/Event');
 const qrcode = require('qrcode');
 const { uploadToIPFS } = require('../services/ipfsService');
 const activityController = require('./activityController');
+const Activity = require('../models/Activity');
+const User = require('../models/User');
 
 exports.generateQRCode = async (req, res) => {
   try {
@@ -138,11 +140,11 @@ exports.verifyQRAndMintNFT = async (req, res) => {
       event: parsedData.eventId
     });
     
-    if (existingActivity) {
-      return res.status(400).json({ 
-        message: 'You have already participated in this event and received rewards'
-      });
-    }
+    // if (existingActivity) {
+    //   return res.status(400).json({ 
+    //     message: 'You have already participated in this event and received rewards'
+    //   });
+    // }
     
     const qrCode = await QRCode.findOne({
       event: parsedData.eventId,

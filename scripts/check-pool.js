@@ -1,10 +1,8 @@
-
 require('dotenv').config();
 const { ethers } = require('ethers');
 
 async function checkPool() {
   try {
-    // Import the SDK
     const { GoodCollectiveSDK } = await import('@gooddollar/goodcollective-sdk');
     
     const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
@@ -14,27 +12,17 @@ async function checkPool() {
       network: "development-celo"
     });
     
-    // Get pool address from env
     const poolAddress = process.env.POOL_ADDRESS;
     
     if (!poolAddress) {
       throw new Error('Pool address not found in environment');
     }
     
-    
-    // Attach to the pool contract
     const poolContract = sdk.pool.attach(poolAddress);
     
-    // Get pool settings
     const settings = await poolContract.settings();
-    console.log('Pool settings:', {
-      nftType: settings.nftType.toString(),
-      manager: settings.manager,
-      rewardToken: settings.rewardToken
-    });
     
-    // Fetch G$ token balance of the pool
-    const g$TokenAddress = '0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A'; // G$ on Celo
+    const g$TokenAddress = '0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A';
     const tokenContract = new ethers.Contract(
       g$TokenAddress,
       ['function balanceOf(address account) external view returns (uint256)',
@@ -44,7 +32,6 @@ async function checkPool() {
     
     const balance = await tokenContract.balanceOf(poolAddress);
     const symbol = await tokenContract.symbol();
-    console.log(`Pool ${symbol} balance:`, ethers.utils.formatEther(balance));
     
     return {
       address: poolAddress,
@@ -57,12 +44,11 @@ async function checkPool() {
       }
     };
   } catch (error) {
-    console.error('Error checking pool:', error);
     throw error;
   }
 }
 
-// Run the function
+
 checkPool()
   .then(result => {
     console.log('Pool check completed:', result);
