@@ -75,7 +75,6 @@ exports.mintActivityNFT = async (req, res) => {
     
     console.log(`Minting real NFT for wallet: ${user.walletAddress}`);
     
-    // Mint NFT using GoodDollar service
     const nftResult = await goodDollarService.mintNFT(
       user.walletAddress,
       activity.event.activityType,
@@ -84,7 +83,6 @@ exports.mintActivityNFT = async (req, res) => {
       activity._id.toString()
     );
     
-    // Update activity with NFT ID
     activity.nftId = nftResult.nftId;
     activity.txHash = nftResult.txHash;
     activity.verified = true;
@@ -99,7 +97,6 @@ exports.mintActivityNFT = async (req, res) => {
   } catch (error) {
     console.error('Error minting NFT:', error);
     
-    // Return a detailed error message for debugging
     res.status(500).json({ 
       message: 'Blockchain transaction failed',
       error: error.message,
@@ -123,7 +120,6 @@ exports.getUserActivities = async (req, res) => {
 
 exports.getAllActivities = async (req, res) => {
   try {
-    // Only admins should have access to this endpoint
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
@@ -151,7 +147,6 @@ exports.getActivityById = async (req, res) => {
       return res.status(404).json({ message: 'Activity not found' });
     }
     
-    // Check if user is authorized to view this activity
     if (activity.user._id.toString() !== req.user.userId && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }

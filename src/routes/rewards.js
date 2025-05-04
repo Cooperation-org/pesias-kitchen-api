@@ -1,4 +1,3 @@
-// src/routes/rewards.js
 const express = require('express');
 const rewardsController = require('../controllers/rewardsController');
 const { authenticate } = require('../middleware/auth');

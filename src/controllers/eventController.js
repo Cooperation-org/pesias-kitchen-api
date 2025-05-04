@@ -1,7 +1,5 @@
-// src/controllers/eventController.js
 const Event = require('../models/Event');
 
-// Get all events
 exports.getAllEvents = async (req, res) => {
   try {
     const events = await Event.find()
@@ -15,7 +13,6 @@ exports.getAllEvents = async (req, res) => {
   }
 };
 
-// Get event by ID
 exports.getEventById = async (req, res) => {
   try {
     const event = await Event.findById(req.params.eventId)
@@ -33,7 +30,6 @@ exports.getEventById = async (req, res) => {
   }
 };
 
-// Create event (admin only)
 exports.createEvent = async (req, res) => {
   try {
     const { title, description, location, date, activityType, capacity } = req.body;
@@ -64,12 +60,10 @@ exports.createEvent = async (req, res) => {
   }
 };
 
-// Update event (admin only)
 exports.updateEvent = async (req, res) => {
   try {
     const { title, description, location, date, activityType, capacity } = req.body;
     
-    // Build update object
     const updates = {};
     if (title) updates.title = title;
     if (description) updates.description = description;
@@ -98,7 +92,6 @@ exports.updateEvent = async (req, res) => {
   }
 };
 
-// Delete event (admin only)
 exports.deleteEvent = async (req, res) => {
   try {
     const event = await Event.findById(req.params.eventId);
@@ -116,7 +109,6 @@ exports.deleteEvent = async (req, res) => {
   }
 };
 
-// Join event
 exports.joinEvent = async (req, res) => {
   try {
     const event = await Event.findById(req.params.eventId);
@@ -125,22 +117,18 @@ exports.joinEvent = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
     
-    // Check if event is in the past
     if (new Date(event.date) < new Date()) {
       return res.status(400).json({ message: 'Cannot join past events' });
     }
     
-    // Check if event is at capacity
     if (event.capacity > 0 && event.participants.length >= event.capacity) {
       return res.status(400).json({ message: 'Event is at full capacity' });
     }
     
-    // Check if user is already a participant
     if (event.participants.includes(req.user.userId)) {
       return res.status(400).json({ message: 'You are already registered for this event' });
     }
     
-    // Add user to participants
     event.participants.push(req.user.userId);
     await event.save();
     
@@ -154,7 +142,6 @@ exports.joinEvent = async (req, res) => {
   }
 };
 
-// Leave event
 exports.leaveEvent = async (req, res) => {
   try {
     const event = await Event.findById(req.params.eventId);
@@ -163,17 +150,14 @@ exports.leaveEvent = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
     
-    // Check if event is in the past
     if (new Date(event.date) < new Date()) {
       return res.status(400).json({ message: 'Cannot leave past events' });
     }
     
-    // Check if user is a participant
     if (!event.participants.includes(req.user.userId)) {
       return res.status(400).json({ message: 'You are not registered for this event' });
     }
     
-    // Remove user from participants
     event.participants = event.participants.filter(
       participant => participant.toString() !== req.user.userId
     );

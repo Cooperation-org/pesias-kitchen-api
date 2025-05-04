@@ -1,4 +1,3 @@
-// checkPoolAddresses.mjs
 import dotenv from 'dotenv';
 import { ethers } from 'ethers';
 import { GoodCollectiveSDK } from '@gooddollar/goodcollective-sdk';

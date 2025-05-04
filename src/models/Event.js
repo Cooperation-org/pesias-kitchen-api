@@ -26,7 +26,7 @@ const eventSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  defaultQuantity: { // Add this to store the default quantity for this event
+  defaultQuantity: { 
     type: Number,
     default: 1,
   },

@@ -15,12 +15,10 @@ const rewardsRoutes = require('./routes/rewards');
 
 const app = express();
 
-// Middleware
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
-// Connect to MongoDB
 connectDB()
   .then(() => {
     console.log('MongoDB connected');
@@ -30,7 +28,6 @@ connectDB()
     process.exit(1);
   });
 
-// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/qr', qrCodeRoutes);
 app.use('/api/activity', activityRoutes);
@@ -39,12 +36,12 @@ app.use('/api/event', eventRoutes);
 app.use('/api/pool', poolRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/rewards', rewardsRoutes);
-// Test route
+
+
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Pesia\'s Kitchen API is running!' });
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: 'Internal Server Error' });

@@ -1,53 +1,10 @@
-// // src/controllers/nftController.js
-// exports.getNFTDetails = async (req, res) => {
-//     try {
-//       const { nftId } = req.params;
-      
-//       // Find activity that has this NFT ID
-//       const activity = await Activity.findOne({ nftId })
-//         .populate('event')
-//         .populate('user', 'name walletAddress');
-      
-//       if (!activity) {
-//         return res.status(404).json({ message: 'NFT not found' });
-//       }
-      
-//       // Construct NFT metadata
-//       const nftMetadata = {
-//         id: activity.nftId,
-//         name: `Pesia's Kitchen - ${activity.event.activityType}`,
-//         description: `Food rescue activity at ${activity.event.location} with quantity ${activity.quantity}kg`,
-//         image: `https://your-api.com/api/nft/${activity.nftId}/image`, // You'd generate this image
-//         attributes: [
-//           { trait_type: 'Activity Type', value: activity.event.activityType },
-//           { trait_type: 'Location', value: activity.event.location },
-//           { trait_type: 'Quantity', value: activity.quantity },
-//           { trait_type: 'Date', value: activity.timestamp },
-//           { trait_type: 'Reward', value: `${activity.event.activityType === 'food_sorting' ? '1' : 
-//                                            activity.event.activityType === 'food_distribution' ? '2' : '1.5'} G$` }
-//         ],
-//         txHash: activity.nftTxHash || 'mock-transaction',
-//         owner: activity.user.walletAddress
-//       };
-      
-//       res.status(200).json(nftMetadata);
-//     } catch (error) {
-//       console.error('Error fetching NFT details:', error);
-//       res.status(500).json({ message: 'Server error' });
-//     }
-//   };
 
-
-
-// src/controllers/nftController.js
 const Activity = require('../models/Activity');
-const User = require('../models/User');
 
 exports.getNFTDetails = async (req, res) => {
   try {
     const { nftId } = req.params;
     
-    // Find activity that has this NFT ID
     const activity = await Activity.findOne({ nftId })
       .populate('event')
       .populate('user', 'name walletAddress');
@@ -56,7 +13,6 @@ exports.getNFTDetails = async (req, res) => {
       return res.status(404).json({ message: 'NFT not found' });
     }
     
-    // Determine reward amount based on activity type
     let rewardAmount;
     switch (activity.event.activityType) {
       case 'food_sorting': rewardAmount = 1; break;
@@ -65,7 +21,6 @@ exports.getNFTDetails = async (req, res) => {
       default: rewardAmount = 1;
     }
     
-    // Construct NFT metadata
     const nftMetadata = {
       id: activity.nftId,
       name: `Pesia's Kitchen - ${activity.event.activityType.replace('_', ' ')}`,
@@ -93,7 +48,6 @@ exports.getNFTImage = async (req, res) => {
   try {
     const { nftId } = req.params;
     
-    // Find activity
     const activity = await Activity.findOne({ nftId })
       .populate('event');
     
@@ -101,16 +55,14 @@ exports.getNFTImage = async (req, res) => {
       return res.status(404).json({ message: 'NFT not found' });
     }
     
-    // Determine color based on activity type
     let color;
     switch (activity.event.activityType) {
-      case 'food_sorting': color = '#4CAF50'; break; // Green
-      case 'food_distribution': color = '#2196F3'; break; // Blue
-      case 'food_pickup': color = '#FF9800'; break; // Orange
-      default: color = '#9C27B0'; // Purple
+      case 'food_sorting': color = '#4CAF50'; break; 
+      case 'food_distribution': color = '#2196F3'; break; 
+      case 'food_pickup': color = '#FF9800'; break; 
+      default: color = '#9C27B0'; e
     }
     
-    // Generate an SVG image
     const svgImage = `
       <svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="0 0 500 500">
         <!-- Background -->
@@ -158,7 +110,6 @@ exports.getNFTImage = async (req, res) => {
 
 exports.getUserNFTs = async (req, res) => {
   try {
-    // Find all activities with NFTs for the user
     const activities = await Activity.find({
       user: req.user.userId,
       nftId: { $ne: null }
@@ -168,7 +119,6 @@ exports.getUserNFTs = async (req, res) => {
       return res.status(200).json({ message: 'No NFTs found', nfts: [] });
     }
     
-    // Transform to NFT format
     const nfts = activities.map(activity => {
       return {
         id: activity.nftId,

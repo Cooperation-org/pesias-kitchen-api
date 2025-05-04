@@ -1,4 +1,3 @@
-// src/routes/pool.js
 const express = require('express');
 const poolController = require('../controllers/poolController');
 const { authenticate } = require('../middleware/auth');
