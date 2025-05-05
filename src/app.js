@@ -42,6 +42,12 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'Pesia\'s Kitchen API is running!' });
 });
 
+
+app.get('/', (req, res) => {
+  res.json({ message: 'Welcome to Pesia\'s Kitchen API' });
+});
+
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: 'Internal Server Error' });
