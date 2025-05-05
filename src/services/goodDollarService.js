@@ -23,11 +23,8 @@ exports.mintNFT = async (userWallet, activityType, location, quantity, activityI
     });
     
     const poolAddress = process.env.POOL_ADDRESS;
-    
-    if (!poolAddress) {
-      throw new Error('Pool address not defined in environment');
-    }
-    
+
+  
     const poolContract = sdk.pool.attach(poolAddress);
     
     const settings = await poolContract.settings();
