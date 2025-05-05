@@ -1,98 +1,187 @@
+const { ethers } = require('ethers');
 
-// const { ethers } = require('ethers');
-// // Replace this:
-// // const { GoodCollectiveSDK } = require('@gooddollar/goodcollective-sdk');
+const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+const chainId = process.env.CHAIN_ID ? parseInt(process.env.CHAIN_ID) : 42220;
 
-// const RPC_URL = process.env.RPC_URL;
-// const PRIVATE_KEY = process.env.PRIVATE_KEY;
 
-// if (!RPC_URL) {
-//   console.error('RPC_URL is not defined in environment variables');
-// }
 
-// if (!PRIVATE_KEY) {
-//   console.error('PRIVATE_KEY is not defined in environment variables');
-// }
+exports.mintNFT = async (userWallet, activityType, location, quantity, activityId) => {
+  try {
+    let subtype;
+    switch (activityType) {
+      case 'food_sorting': subtype = 1; break;
+      case 'food_distribution': subtype = 2; break;
+      case 'food_pickup': subtype = 3; break;
+      default: subtype = 1;
+    }
+    
+    const { GoodCollectiveSDK } = await import('@gooddollar/goodcollective-sdk');
+    
+    const sdk = new GoodCollectiveSDK(chainId.toString(), provider, {
+      network: "development-celo"
+    });
+    
+    const poolAddress = process.env.POOL_ADDRESS;
 
-// // Initialize provider and signer
-// const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
-// const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-// const chainId = process.env.CHAIN_ID ? parseInt(process.env.CHAIN_ID) : 42220; // Default to Celo Mainnet
+  
+    const poolContract = sdk.pool.attach(poolAddress);
+    
+    const settings = await poolContract.settings();
+    
+    const contractWithSigner = poolContract.connect(wallet);
 
-// exports.mintNFT = async (userWallet, activityType, location, quantity, activityId) => {
-//   try {
-//     // Dynamically import the ES module
-//     const { GoodCollectiveSDK } = await import('@gooddollar/goodcollective-sdk');
-//     const sdk = new GoodCollectiveSDK(chainId, provider);
+    let rewardAmount;
+    switch (activityType) {
+      case 'food_sorting': rewardAmount = 1; break;
+      case 'food_distribution': rewardAmount = 2; break;
+      case 'food_pickup': rewardAmount = 1.5; break;
+      default: rewardAmount = 1;
+    }
     
-//     // Get pool address from env
-//     const poolAddress = process.env.POOL_ADDRESS;
+    try {
+      const timestamp = Math.floor(Date.now() / 1000);
+      ethers.utils.parseEther(rewardAmount.toString());
+
+      const nftData = {
+        nftType: settings.nftType,
+        version: 1,
+        nftUri: `https://pesias-kitchen.org/activities/${activityId}`,
+        events: [
+          {
+            subtype: subtype,
+            timestamp: timestamp,
+            location: location,
+            quantity: 1,
+            eventUri: `https://pesias-kitchen.org/events/${activityId}`,
+            contributers: [userWallet], 
+            rewardOverride: 0
+          }
+        ]
+      };
+      
+      const tx = await contractWithSigner.mintNFT(
+        userWallet,        
+        nftData,            
+        true,               
+        { gasLimit: 1000000 }
+      );
+      
+      const receipt = await tx.wait();
+      
+      return {
+        nftId,
+        txHash: receipt.transactionHash,
+        rewardAmount,
+        fromPool: true
+      };
+    } catch (error) {
+      let rewardAmount;
+      switch (activityType) {
+        case 'food_sorting': rewardAmount = 1; break;
+        case 'food_distribution': rewardAmount = 2; break;
+        case 'food_pickup': rewardAmount = 1.5; break;
+        default: rewardAmount = 1;
+      }
+      
+      const g$TokenAddress = '0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A';
+      const tokenContract = new ethers.Contract(
+        g$TokenAddress,
+        ['function transfer(address to, uint256 amount) returns (bool)'],
+        provider
+      );
+      
+      const tx = await tokenContract.connect(wallet).transfer(
+        userWallet,
+        ethers.utils.parseEther(rewardAmount.toString()),
+        { gasLimit: 300000 }
+      );
+      
+      const receipt = await tx.wait();
+      
+      const nftId = `nft-${receipt.transactionHash}`;
+      
+      return {
+        nftId,
+        txHash: receipt.transactionHash,
+        rewardAmount,
+        fromPool: false
+      };
+    }
+  } catch (error) {
+    throw error;
+  }
+};
+
+exports.getPoolInfo = async () => {
+  try {
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Blockchain call timed out after 30 seconds'));
+      }, 30000);
+    });
     
-//     if (!poolAddress) {
-//       throw new Error('Pool address not defined in environment');
-//     }
-    
-//     // Get the pool
-//     const pool = await sdk.getPool(poolAddress);
-//     const assignedType = (await pool.settings()).nftType;
-    
-//     // Create metadata for IPFS
-//     const metadata = {
-//       name: `Pesia's Kitchen - ${activityType}`,
-//       description: `Food rescue activity at ${location} with quantity ${quantity}kg`,
-//       attributes: [
-//         { trait_type: 'Activity Type', value: activityType },
-//         { trait_type: 'Location', value: location },
-//         { trait_type: 'Quantity', value: quantity },
-//         { trait_type: 'Activity ID', value: activityId }
-//       ]
-//     };
-    
-//     // Convert metadata to string
-//     const metadataStr = JSON.stringify(metadata);
-    
-//     // Upload to IPFS
-//     const ipfsService = require('./ipfsService.js');
-//     const ipfsCid = await ipfsService.uploadToIPFS(metadataStr);
-    
-//     // Prepare NFT data
-//     const nftData = {
-//       nftType: assignedType,
-//       nftUri: `ipfs://${ipfsCid}`,
-//       version: 1,
-//       events: [
-//         {
-//           eventUri: `ipfs://${ipfsCid}`,
-//           subtype: 1, // Activity type ID
-//           contributers: [userWallet],
-//           timestamp: Math.floor(Date.now() / 1000),
-//           quantity: ethers.BigNumber.from(quantity),
-//         },
-//       ],
-//     };
-    
-//     // Mint the NFT
-//     const nft = await sdk.mintNft(
-//       wallet,
-//       poolAddress,
-//       userWallet,
-//       nftData,
-//       true // Claim rewards immediately
-//     );
-    
-//     const tx = await nft.wait();
-    
-//     // Extract NFT ID from transaction logs (this is simplified)
-//     // In a real implementation, you'd need to decode the logs to get the actual NFT ID
-//     const nftId = `nft-${Date.now()}`;
-    
-//     return {
-//       nftId,
-//       txHash: tx.transactionHash,
-//       ipfsCid
-//     };
-//   } catch (error) {
-//     console.error('Error minting NFT:', error);
-//     throw error;
-//   }
-// };
+    const fetchDataPromise = async () => {
+      try {
+        const { GoodCollectiveSDK } = await import('@gooddollar/goodcollective-sdk');
+        
+        const sdk = new GoodCollectiveSDK(chainId.toString(), provider, {
+          network: "development-celo"
+        });
+        
+        const poolAddress = process.env.POOL_ADDRESS;
+        
+        if (!poolAddress) {
+          throw new Error('Pool address not defined in environment');
+        }
+        
+        const factory = sdk.factory;
+        
+        const registryInfo = await factory.registry(poolAddress).catch(e => {
+          throw e;
+        });
+        
+        const poolContract = sdk.pool.attach(poolAddress);
+        
+        const settings = await poolContract.settings().catch(e => {
+          throw e;
+        });
+        
+        const g$TokenAddress = '0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A';
+        const tokenContract = new ethers.Contract(
+          g$TokenAddress,
+          ['function balanceOf(address account) external view returns (uint256)'],
+          provider
+        );
+        
+        const balance = await tokenContract.balanceOf(poolAddress).catch(e => {
+          throw e;
+        });
+        
+        const result = {
+          address: poolAddress,
+          balance: ethers.utils.formatEther(balance),
+          settings: {
+            nftType: settings.nftType.toString(),
+            manager: settings.manager,
+            rewardToken: settings.rewardToken,
+          },
+          registry: {
+            ipfs: registryInfo.ipfs,
+            isVerified: registryInfo.isVerified,
+            projectId: registryInfo.projectId
+          }
+        };
+        
+        return result;
+      } catch (err) {
+        throw err;
+      }
+    };
+
+    const result = await Promise.race([fetchDataPromise(), timeoutPromise]);
+    return result;
+  } catch (error) {
+    throw error;
+  }
+};

@@ -1,10 +1,9 @@
 const User = require('../models/User');
 
-// Get current user profile
 exports.getCurrentUser = async (req, res) => {
   try {
     const user = await User.findById(req.user.userId)
-      .select('-nonce') // Exclude sensitive fields
+      .select('-nonce') 
       .populate('activities');
     
     if (!user) {
@@ -18,12 +17,10 @@ exports.getCurrentUser = async (req, res) => {
   }
 };
 
-// Update user profile
 exports.updateProfile = async (req, res) => {
   try {
     const { name } = req.body;
     
-    // Only allow updating specific fields
     const updates = {};
     if (name) updates.name = name;
     
@@ -44,7 +41,6 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-// Get all users (admin only)
 exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.find()
@@ -58,7 +54,6 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-// Get user by ID (admin only)
 exports.getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.userId)
@@ -76,7 +71,6 @@ exports.getUserById = async (req, res) => {
   }
 };
 
-// Update user role (admin only)
 exports.updateUserRole = async (req, res) => {
   try {
     const { role } = req.body;

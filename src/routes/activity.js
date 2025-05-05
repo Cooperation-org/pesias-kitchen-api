@@ -22,4 +22,16 @@ router.get(
   activityController.getUserActivities
 );
 
+router.get(
+  '/:activityId',
+  authenticate,
+  activityController.getActivityById
+);
+
+router.get(
+  '/',
+  authenticate,
+  activityController.getAllActivities
+);
+
 module.exports = router;

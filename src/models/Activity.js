@@ -28,6 +28,10 @@ const activitySchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  txHash: {  
+    type: String,
+    default: null,
+  },
   timestamp: {
     type: Date,
     default: Date.now,

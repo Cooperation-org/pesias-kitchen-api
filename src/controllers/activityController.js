@@ -1,9 +1,10 @@
+
 const Activity = require('../models/Activity');
 const QRCode = require('../models/QRCode');
 const Event = require('../models/Event');
 const User = require('../models/User');
-const { mintNFT } = require('../services/goodDollarService');
 
+const goodDollarService = require('../services/goodDollarService');
 
 exports.recordActivity = async (req, res) => {
   try {
@@ -13,7 +14,6 @@ exports.recordActivity = async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields' });
     }
     
-    // Find the event and QR code
     const event = await Event.findById(eventId);
     const qrCode = await QRCode.findById(qrCodeId);
     
@@ -25,7 +25,6 @@ exports.recordActivity = async (req, res) => {
       return res.status(404).json({ message: 'QR code not found' });
     }
     
-    // Create new activity record
     const newActivity = new Activity({
       event: event._id,
       qrCode: qrCode._id,
@@ -36,7 +35,6 @@ exports.recordActivity = async (req, res) => {
     
     await newActivity.save();
     
-    // Add activity to user's activities
     await User.findByIdAndUpdate(
       req.user.userId,
       { $push: { activities: newActivity._id } }
@@ -52,11 +50,14 @@ exports.recordActivity = async (req, res) => {
   }
 };
 
+
 exports.mintActivityNFT = async (req, res) => {
   try {
     const { activityId } = req.params;
     
-    const activity = await Activity.findById(activityId);
+    const activity = await Activity.findById(activityId)
+      .populate('event')
+      .populate('user');
     
     if (!activity) {
       return res.status(404).json({ message: 'Activity not found' });
@@ -72,39 +73,87 @@ exports.mintActivityNFT = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Mint NFT using GoodDollar service
-    const nftResult = await mintNFT(
+    console.log(`Minting real NFT for wallet: ${user.walletAddress}`);
+    
+    const nftResult = await goodDollarService.mintNFT(
       user.walletAddress,
-      activity.type,
-      activity.location,
+      activity.event.activityType,
+      activity.event.location,
       activity.quantity,
       activity._id.toString()
     );
     
-    // Update activity with NFT ID
     activity.nftId = nftResult.nftId;
+    activity.txHash = nftResult.txHash;
     activity.verified = true;
     await activity.save();
     
     res.status(200).json({
-      message: 'NFT minted successfully',
+      message: 'NFT minted successfully and G$ rewards claimed via blockchain',
       nftId: nftResult.nftId,
-      txHash: nftResult.txHash
+      txHash: nftResult.txHash,
+      rewardAmount: nftResult.rewardAmount
     });
   } catch (error) {
     console.error('Error minting NFT:', error);
-    res.status(500).json({ message: 'Server error' });
+    
+    res.status(500).json({ 
+      message: 'Blockchain transaction failed',
+      error: error.message,
+      details: error.toString()
+    });
   }
 };
 
 exports.getUserActivities = async (req, res) => {
   try {
     const activities = await Activity.find({ user: req.user.userId })
+      .populate('event')
       .sort({ timestamp: -1 });
     
     res.status(200).json(activities);
   } catch (error) {
     console.error('Error fetching user activities:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getAllActivities = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    
+    const activities = await Activity.find()
+      .populate('user', 'name walletAddress')
+      .populate('event')
+      .sort({ timestamp: -1 });
+    
+    res.status(200).json(activities);
+  } catch (error) {
+    console.error('Error fetching all activities:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getActivityById = async (req, res) => {
+  try {
+    const activity = await Activity.findById(req.params.activityId)
+      .populate('user', 'name walletAddress')
+      .populate('event')
+      .populate('qrCode');
+    
+    if (!activity) {
+      return res.status(404).json({ message: 'Activity not found' });
+    }
+    
+    if (activity.user._id.toString() !== req.user.userId && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    
+    res.status(200).json(activity);
+  } catch (error) {
+    console.error('Error fetching activity:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

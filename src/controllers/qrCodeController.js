@@ -1,11 +1,10 @@
-
-
-// src/controllers/qrCodeController.js
 const QRCode = require('../models/QRCode');
 const Event = require('../models/Event');
-const User = require('../models/User');
 const qrcode = require('qrcode');
 const { uploadToIPFS } = require('../services/ipfsService');
+const activityController = require('./activityController');
+const Activity = require('../models/Activity');
+const User = require('../models/User');
 
 exports.generateQRCode = async (req, res) => {
   try {
@@ -15,17 +14,14 @@ exports.generateQRCode = async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields' });
     }
     
-    // Find the event
     const event = await Event.findById(eventId);
     
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
     
-    // Set expiration date to event date
     const expiration = new Date(event.date);
     
-    // Create QR code data
     const qrData = {
       eventId: event._id,
       type,
@@ -33,13 +29,10 @@ exports.generateQRCode = async (req, res) => {
       id: Math.random().toString(36).substring(2, 15) // Simple unique ID
     };
     
-    // Generate QR code image
     const qrImage = await qrcode.toDataURL(JSON.stringify(qrData));
     
-    // Upload QR code image to IPFS
     const ipfsCid = await uploadToIPFS(qrImage);
     
-    // Create QR code record in database
     const newQRCode = new QRCode({
       event: event._id,
       type,
@@ -78,19 +71,16 @@ exports.verifyQRCode = async (req, res) => {
     
     const parsedData = JSON.parse(qrData);
     
-    // Validate QR code format
     if (!parsedData.id || !parsedData.eventId) {
       return res.status(400).json({ message: 'Invalid QR code format' });
     }
     
-    // Find related event
     const event = await Event.findById(parsedData.eventId);
     
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
     
-    // Find QR code in database
     const qrCode = await QRCode.findOne({
       event: parsedData.eventId,
       isActive: true,
@@ -101,7 +91,6 @@ exports.verifyQRCode = async (req, res) => {
       return res.status(404).json({ message: 'QR code not found or expired' });
     }
     
-    // Increment the used count
     qrCode.usedCount += 1;
     await qrCode.save();
     
@@ -122,5 +111,129 @@ exports.verifyQRCode = async (req, res) => {
   } catch (error) {
     console.error('Error verifying QR code:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.verifyQRAndMintNFT = async (req, res) => {
+  try {
+    const { qrData, quantity, notes } = req.body;
+    
+    if (!qrData) {
+      return res.status(400).json({ message: 'QR data is required' });
+    }
+    
+    const parsedData = JSON.parse(qrData);
+    
+    if (!parsedData.id || !parsedData.eventId) {
+      return res.status(400).json({ message: 'Invalid QR code format' });
+    }
+    
+    const event = await Event.findById(parsedData.eventId);
+    
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    // Check if user has already participated in this event
+    const existingActivity = await Activity.findOne({
+      user: req.user.userId,
+      event: parsedData.eventId
+    });
+    
+    // if (existingActivity) {
+    //   return res.status(400).json({ 
+    //     message: 'You have already participated in this event and received rewards'
+    //   });
+    // }
+    
+    const qrCode = await QRCode.findOne({
+      event: parsedData.eventId,
+      isActive: true,
+      expiresAt: { $gt: new Date() }
+    });
+    
+    if (!qrCode) {
+      return res.status(404).json({ message: 'QR code not found or expired' });
+    }
+    
+    qrCode.usedCount += 1;
+    await qrCode.save();
+    
+    const activityReq = {
+      body: {
+        eventId: event._id,
+        qrCodeId: qrCode._id,
+        quantity: quantity || event.defaultQuantity || 1,
+        notes: notes || ''
+      },
+      user: req.user 
+    };
+    
+    const activityRes = {
+      status: function(statusCode) {
+        this.statusCode = statusCode;
+        return this;
+      },
+      json: function(data) {
+        this.data = data;
+        return this;
+      }
+    };
+    
+    await activityController.recordActivity(activityReq, activityRes);
+    
+    if (activityRes.statusCode !== 201) {
+      return res.status(activityRes.statusCode).json(activityRes.data);
+    }
+    
+    const newActivity = activityRes.data.activity;
+    
+    const nftReq = {
+      params: {
+        activityId: newActivity._id
+      },
+      user: req.user
+    };
+    
+    const nftRes = {
+      status: function(statusCode) {
+        this.statusCode = statusCode;
+        return this;
+      },
+      json: function(data) {
+        this.data = data;
+        return this;
+      }
+    };
+    
+    await activityController.mintActivityNFT(nftReq, nftRes);
+    
+    if (nftRes.statusCode !== 200) {
+      return res.status(nftRes.statusCode).json(nftRes.data);
+    }
+    
+    // Update user's activities array to include this activity
+    await User.findByIdAndUpdate(
+      req.user.userId,
+      { $addToSet: { activities: newActivity._id } }
+    );
+    
+    res.status(200).json({
+      message: 'QR code verified, activity recorded, and NFT minted successfully',
+      activity: newActivity,
+      nft: {
+        nftId: nftRes.data.nftId,
+        txHash: nftRes.data.txHash,
+        rewardAmount: nftRes.data.rewardAmount || '~'
+      },
+      event: {
+        title: event.title,
+        activityType: event.activityType,
+        location: event.location
+      }
+    });
+  } catch (error) {
+    console.error('Error in QR verification and NFT minting process:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

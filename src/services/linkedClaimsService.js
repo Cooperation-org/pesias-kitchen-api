@@ -1,4 +1,3 @@
-// src/services/linkedClaimsService.js
 const axios = require('axios');
 
 class LinkedClaimsService {
@@ -22,7 +21,7 @@ class LinkedClaimsService {
           date: activity.date,
           location: activity.location
         },
-        role: role, // 'volunteer' or 'recipient'
+        role: role, 
         metrics: activity.metrics,
         issuanceDate: new Date().toISOString()
       };
