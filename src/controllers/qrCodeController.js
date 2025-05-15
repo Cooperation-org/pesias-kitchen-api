@@ -19,6 +19,12 @@ exports.generateQRCode = async (req, res) => {
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
+
+    if (event.qrCodes[type]) {
+      return res.status(400).json({ 
+        message: `${type} QR code already exists for this event` 
+      });
+    }
     
     const expiration = new Date(event.date);
     
@@ -43,6 +49,9 @@ exports.generateQRCode = async (req, res) => {
     
     await newQRCode.save();
     
+    event.qrCodes[type] = newQRCode._id;
+    await event.save();
+
     res.status(201).json({
       message: 'QR code generated successfully',
       qrCode: {
@@ -140,11 +149,11 @@ exports.verifyQRAndMintNFT = async (req, res) => {
       event: parsedData.eventId
     });
     
-    // if (existingActivity) {
-    //   return res.status(400).json({ 
-    //     message: 'You have already participated in this event and received rewards'
-    //   });
-    // }
+    if (existingActivity) {
+      return res.status(400).json({ 
+        message: 'You have already participated in this event and received rewards'
+      });
+    }
     
     const qrCode = await QRCode.findOne({
       event: parsedData.eventId,
