@@ -12,6 +12,9 @@ const eventRoutes = require('./routes/event');
 const poolRoutes = require('./routes/pool');
 const nftRoutes = require('./routes/nft');
 const rewardsRoutes = require('./routes/rewards');
+const linkedTrustRoutes = require('./routes/linkedTrust');
+const analyticsRoutes= require('./routes/analytics')
+
 
 const app = express();
 
@@ -36,6 +39,9 @@ app.use('/api/event', eventRoutes);
 app.use('/api/pool', poolRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/rewards', rewardsRoutes);
+app.use('/api/linkedtrust', linkedTrustRoutes);
+app.use('/api/analytics', analyticsRoutes);
+
 
 
 app.get('/api/test', (req, res) => {
