@@ -73,8 +73,15 @@ exports.mintActivityNFT = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    console.log(`Minting real NFT for wallet: ${user.walletAddress}`);
+    const qrCode = await QRCode.findById(activity.qrCode);
+    if (!qrCode) {
+      return res.status(404).json({ message: 'QR code not found' });
+    }
     
+    if (qrCode.type !== 'volunteer') {
+      return res.status(403).json({ message: 'Only volunteer activities can mint NFTs' });
+    }
+
     const nftResult = await goodDollarService.mintNFT(
       user.walletAddress,
       activity.event.activityType,

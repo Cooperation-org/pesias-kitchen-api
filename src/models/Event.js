@@ -38,6 +38,18 @@ const eventSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+  qrCodes: {
+    volunteer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'QRCode',
+      default: null
+    },
+    recipient: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'QRCode',
+      default: null
+    }
+  },
   createdAt: {
     type: Date,
     default: Date.now,

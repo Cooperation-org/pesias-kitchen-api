@@ -4,7 +4,9 @@ exports.getAllEvents = async (req, res) => {
   try {
     const events = await Event.find()
       .sort({ date: 1 })
-      .populate('createdBy', 'name walletAddress');
+      .populate('createdBy', 'name walletAddress')
+      .populate('qrCodes.volunteer')
+      .populate('qrCodes.recipient');
     
     res.status(200).json(events);
   } catch (error) {
@@ -17,8 +19,10 @@ exports.getEventById = async (req, res) => {
   try {
     const event = await Event.findById(req.params.eventId)
       .populate('createdBy', 'name walletAddress')
-      .populate('participants', 'name walletAddress');
-    
+      .populate('participants', 'name walletAddress')
+      .populate('qrCodes.volunteer')
+      .populate('qrCodes.recipient');
+      
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
