@@ -92,6 +92,7 @@ exports.verifyQRCode = async (req, res) => {
     
     const qrCode = await QRCode.findOne({
       event: parsedData.eventId,
+      type: parsedData.type,
       isActive: true,
       expiresAt: { $gt: new Date() }
     });
@@ -99,15 +100,32 @@ exports.verifyQRCode = async (req, res) => {
     if (!qrCode) {
       return res.status(404).json({ message: 'QR code not found or expired' });
     }
+
+    let message, userRole, nextSteps;
+    
+    if (qrCode.type === 'volunteer') {
+      message = 'Volunteer QR verified successfully!';
+      userRole = 'volunteer';
+      nextSteps = 'Proceed to record your volunteer activity and earn NFT rewards.';
+      context = 'This QR code allows you to participate as a volunteer in this event and earn NFT rewards.';
+    } else if (qrCode.type === 'recipient') {
+      message = 'Recipient QR verified successfully!';
+      userRole = 'recipient';
+      nextSteps = 'Proceed to record your food receipt for tracking purposes.';
+      context = 'This QR code is for recipients to verify food receipt without earning rewards.';
+    }
     
     qrCode.usedCount += 1;
     await qrCode.save();
     
     res.status(200).json({
-      message: 'QR code verified successfully',
+      message,
+      userRole,
+      nextSteps,
       qrCode: {
         id: qrCode._id,
         type: qrCode.type,
+        usedCount: qrCode.usedCount,
         event: {
           id: event._id,
           title: event.title,
@@ -115,7 +133,10 @@ exports.verifyQRCode = async (req, res) => {
           location: event.location,
           defaultQuantity: event.defaultQuantity || 1
         }
-      }
+      },
+      context: qrCode.type === 'volunteer' 
+        ? 'This QR code is for volunteers who will earn NFTs and G$ rewards for their service.'
+        : 'This QR code is for recipients to verify food receipt.'
     });
   } catch (error) {
     console.error('Error verifying QR code:', error);
@@ -143,7 +164,6 @@ exports.verifyQRAndMintNFT = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
     
-    // Check if user has already participated in this event
     const existingActivity = await Activity.findOne({
       user: req.user.userId,
       event: parsedData.eventId
@@ -157,6 +177,7 @@ exports.verifyQRAndMintNFT = async (req, res) => {
     
     const qrCode = await QRCode.findOne({
       event: parsedData.eventId,
+      type: parsedData.type,
       isActive: true,
       expiresAt: { $gt: new Date() }
     });
@@ -197,50 +218,69 @@ exports.verifyQRAndMintNFT = async (req, res) => {
     
     const newActivity = activityRes.data.activity;
     
-    const nftReq = {
-      params: {
-        activityId: newActivity._id
-      },
-      user: req.user
-    };
-    
-    const nftRes = {
-      status: function(statusCode) {
-        this.statusCode = statusCode;
-        return this;
-      },
-      json: function(data) {
-        this.data = data;
-        return this;
+    if (qrCode.type === 'volunteer') {
+      const nftReq = {
+        params: { activityId: newActivity._id },
+        user: req.user
+      };
+      
+      const nftRes = {
+        status: function(statusCode) {
+          this.statusCode = statusCode;
+          return this;
+        },
+        json: function(data) {
+          this.data = data;
+          return this;
+        }
+      };
+      
+      await activityController.mintActivityNFT(nftReq, nftRes);
+      
+      if (nftRes.statusCode !== 200) {
+        return res.status(nftRes.statusCode).json(nftRes.data);
       }
-    };
-    
-    await activityController.mintActivityNFT(nftReq, nftRes);
-    
-    if (nftRes.statusCode !== 200) {
-      return res.status(nftRes.statusCode).json(nftRes.data);
+      
+      await User.findByIdAndUpdate(
+        req.user.userId,
+        { $addToSet: { activities: newActivity._id } }
+      );
+      
+      res.status(200).json({
+        message: 'Volunteer activity recorded and NFT minted successfully! Thank you for your service.',
+        activity: newActivity,
+        nft: {
+          nftId: nftRes.data.nftId,
+          txHash: nftRes.data.txHash,
+          rewardAmount: nftRes.data.rewardAmount || '~'
+        },
+        event: {
+          title: event.title,
+          activityType: event.activityType,
+          location: event.location
+        },
+        userRole: 'volunteer'
+      });
+      
+    } else if (qrCode.type === 'recipient') {
+      await User.findByIdAndUpdate(
+        req.user.userId,
+        { $addToSet: { activities: newActivity._id } }
+      );
+      
+      res.status(200).json({
+        message: 'Thank you for participating! Your food receipt has been recorded.',
+        activity: newActivity,
+        event: {
+          title: event.title,
+          activityType: event.activityType,
+          location: event.location
+        },
+        userRole: 'recipient',
+        note: 'Recipient activities do not earn NFTs or G$ rewards'
+      });
     }
     
-    // Update user's activities array to include this activity
-    await User.findByIdAndUpdate(
-      req.user.userId,
-      { $addToSet: { activities: newActivity._id } }
-    );
-    
-    res.status(200).json({
-      message: 'QR code verified, activity recorded, and NFT minted successfully',
-      activity: newActivity,
-      nft: {
-        nftId: nftRes.data.nftId,
-        txHash: nftRes.data.txHash,
-        rewardAmount: nftRes.data.rewardAmount || '~'
-      },
-      event: {
-        title: event.title,
-        activityType: event.activityType,
-        location: event.location
-      }
-    });
   } catch (error) {
     console.error('Error in QR verification and NFT minting process:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
