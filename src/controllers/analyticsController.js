@@ -13,7 +13,7 @@ exports.getFoodHeroesImpact = async (req, res) => {
     }
 
     const cacheKey = 'foodHeroesImpact';
-    const cachedData = cache.get(cacheKey);
+    let cachedData = cache.get(cacheKey);
     if (cachedData) {
       return res.status(200).json({
         ...cachedData,
@@ -24,7 +24,40 @@ exports.getFoodHeroesImpact = async (req, res) => {
 
     const startTime = Date.now();
 
-    const totalRewardsData = await Activity.aggregate([
+    const participantBreakdown = await Activity.aggregate([
+      {
+        $lookup: {
+          from: 'qrcodes',
+          localField: 'qrCode',
+          foreignField: '_id',
+          as: 'qrCodeData'
+        }
+      },
+      { $unwind: '$qrCodeData' },
+      {
+        $group: {
+          _id: '$qrCodeData.type',
+          uniqueUsers: { $addToSet: '$user' },
+          totalActivities: { $sum: 1 },
+          totalFood: { $sum: '$quantity' },
+          activitiesWithNFT: { 
+            $sum: { $cond: [{ $ne: ['$nftId', null] }, 1, 0] } 
+          }
+        }
+      },
+      {
+        $addFields: {
+          uniqueUserCount: { $size: '$uniqueUsers' }
+        }
+      }
+    ]);
+
+    let volunteersCount = 0;
+    let recipientsCount = 0;
+    let totalGDollarsDistributed = 0;
+    let totalActivitiesWithNFT = 0;
+
+    const rewardsByActivityType = await Activity.aggregate([
       { $match: { nftId: { $ne: null } } },
       {
         $lookup: {
@@ -38,16 +71,13 @@ exports.getFoodHeroesImpact = async (req, res) => {
       {
         $group: {
           _id: '$eventData.activityType',
-          count: { $sum: 1 },
-          totalQuantity: { $sum: '$quantity' }
+          count: { $sum: 1 }
         }
       }
     ]);
 
-    let totalGDollarsDistributed = 0;
     const rewardBreakdown = {};
-    
-    totalRewardsData.forEach(item => {
+    rewardsByActivityType.forEach(item => {
       let rewardPerActivity;
       switch (item._id) {
         case 'food_sorting': rewardPerActivity = 1; break;
@@ -61,27 +91,64 @@ exports.getFoodHeroesImpact = async (req, res) => {
       
       rewardBreakdown[item._id] = {
         activities: item.count,
-        totalFood: item.totalQuantity,
         totalRewards: typeTotal,
         rewardPerActivity
       };
     });
 
-    const totalNFTsMinted = await Activity.countDocuments({ nftId: { $ne: null } });
+    participantBreakdown.forEach(item => {
+      if (item._id === 'volunteer') {
+        volunteersCount = item.uniqueUserCount;
+        totalActivitiesWithNFT += item.activitiesWithNFT;
+      } else if (item._id === 'recipient') {
+        recipientsCount = item.uniqueUserCount;
+      }
+    });
 
-    const foodRescueData = await Activity.aggregate([
+    const totalUniqueParticipants = await Activity.aggregate([
       {
         $group: {
           _id: null,
-          totalFoodRescued: { $sum: '$quantity' },
-          totalActivities: { $sum: 1 }
+          uniqueUsers: { $addToSet: '$user' }
+        }
+      },
+      {
+        $addFields: {
+          totalUnique: { $size: '$uniqueUsers' }
         }
       }
     ]);
-    const totalFoodRescued = foodRescueData[0]?.totalFoodRescued || 0;
-    const totalActivities = foodRescueData[0]?.totalActivities || 0;
 
-    const foodByType = await Activity.aggregate([
+    const overallStats = await Activity.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalActivities: { $sum: 1 },
+          totalFoodRescued: { $sum: '$quantity' },
+          totalNFTsMinted: { 
+            $sum: { $cond: [{ $ne: ['$nftId', null] }, 1, 0] } 
+          }
+        }
+      }
+    ]);
+
+    const stats = overallStats[0] || {};
+    const uniqueCount = totalUniqueParticipants[0]?.totalUnique || 0;
+
+    const totalEvents = await Event.countDocuments();
+    const activeEvents = await Event.countDocuments({ date: { $gte: new Date() } });
+    const completedEvents = await Event.countDocuments({ date: { $lt: new Date() } });
+
+    const eventsByType = await Event.aggregate([
+      {
+        $group: {
+          _id: '$activityType',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const foodByActivityType = await Activity.aggregate([
       {
         $lookup: {
           from: 'events',
@@ -95,28 +162,10 @@ exports.getFoodHeroesImpact = async (req, res) => {
         $group: {
           _id: '$eventData.activityType',
           totalFood: { $sum: '$quantity' },
-          activities: { $sum: 1 }
-        }
-      }
-    ]);
-
-    const totalFoodHeroes = await User.countDocuments();
-    const totalVolunteers = await User.countDocuments({ role: 'volunteer' });
-    const totalRecipients = await User.countDocuments({ role: 'recipient' });
-    const totalAdmins = await User.countDocuments({ role: 'admin' });
-
-    const activeFoodHeroes = await Activity.distinct('user');
-    const totalActiveFoodHeroes = activeFoodHeroes.length;
-
-    const totalEvents = await Event.countDocuments();
-    const activeEvents = await Event.countDocuments({ date: { $gte: new Date() } });
-    const pastEvents = await Event.countDocuments({ date: { $lt: new Date() } });
-
-    const eventsByType = await Event.aggregate([
-      {
-        $group: {
-          _id: '$activityType',
-          count: { $sum: 1 }
+          activities: { $sum: 1 },
+          activitiesWithNFT: { 
+            $sum: { $cond: [{ $ne: ['$nftId', null] }, 1, 0] } 
+          }
         }
       }
     ]);
@@ -132,49 +181,93 @@ exports.getFoodHeroesImpact = async (req, res) => {
     ]);
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const recentImpact = await Activity.aggregate([
+    const recentParticipants = await Activity.aggregate([
       { $match: { timestamp: { $gte: thirtyDaysAgo } } },
+      {
+        $lookup: {
+          from: 'qrcodes',
+          localField: 'qrCode',
+          foreignField: '_id',
+          as: 'qrCodeData'
+        }
+      },
+      { $unwind: '$qrCodeData' },
       {
         $group: {
           _id: {
-            date: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } }
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } },
+            type: '$qrCodeData.type'
           },
           activities: { $sum: 1 },
-          nfts: { $sum: { $cond: [{ $ne: ['$nftId', null] }, 1, 0] } },
-          foodRescued: { $sum: '$quantity' }
+          uniqueUsers: { $addToSet: '$user' },
+          foodRescued: { $sum: '$quantity' },
+          nfts: { $sum: { $cond: [{ $ne: ['$nftId', null] }, 1, 0] } }
         }
       },
-      { $sort: { '_id.date': 1 } }
+      {
+        $group: {
+          _id: '$_id.date',
+          volunteers: {
+            $sum: { 
+              $cond: [
+                { $eq: ['$_id.type', 'volunteer'] }, 
+                { $size: '$uniqueUsers' }, 
+                0
+              ] 
+            }
+          },
+          recipients: {
+            $sum: { 
+              $cond: [
+                { $eq: ['$_id.type', 'recipient'] }, 
+                { $size: '$uniqueUsers' }, 
+                0
+              ] 
+            }
+          },
+          totalActivities: { $sum: '$activities' },
+          totalFood: { $sum: '$foodRescued' },
+          totalNFTs: { $sum: '$nfts' }
+        }
+      },
+      { $sort: { '_id': 1 } }
     ]);
 
-    const avgFoodPerEvent = totalEvents > 0 ? totalFoodRescued / totalEvents : 0;
-    const avgRewardsPerEvent = totalEvents > 0 ? totalGDollarsDistributed / totalEvents : 0;
+    const calculationTime = Date.now() - startTime;
 
     const responseData = {
       foodHeroesImpact: {
+        totalVolunteers: volunteersCount,
+        totalRecipients: recipientsCount,
+        totalUniqueParticipants: uniqueCount,
         totalGDollarsDistributed,
-        totalNFTsMinted,
-        totalFoodRescued,
-        totalActivities,
-        totalActiveFoodHeroes,
+        totalNFTsMinted: stats.totalNFTsMinted || 0,
+        totalFoodRescued: stats.totalFoodRescued || 0,
+        totalActivities: stats.totalActivities || 0,
         totalEvents,
-        avgFoodPerEvent: Math.round(avgFoodPerEvent * 100) / 100,
-        avgRewardsPerEvent: Math.round(avgRewardsPerEvent * 100) / 100
+        avgFoodPerEvent: totalEvents > 0 ? Math.round((stats.totalFoodRescued || 0) / totalEvents * 100) / 100 : 0,
+        avgRewardsPerEvent: totalEvents > 0 ? Math.round(totalGDollarsDistributed / totalEvents * 100) / 100 : 0
+      },
+      participantBreakdown: {
+        volunteers: {
+          count: volunteersCount,
+          activities: participantBreakdown.find(p => p._id === 'volunteer')?.totalActivities || 0,
+          foodProcessed: participantBreakdown.find(p => p._id === 'volunteer')?.totalFood || 0,
+          nftsMinted: participantBreakdown.find(p => p._id === 'volunteer')?.activitiesWithNFT || 0
+        },
+        recipients: {
+          count: recipientsCount,
+          activities: participantBreakdown.find(p => p._id === 'recipient')?.totalActivities || 0,
+          foodReceived: participantBreakdown.find(p => p._id === 'recipient')?.totalFood || 0,
+          nftsMinted: 0 
+        }
       },
       rewardBreakdown,
-      foodByType,
-      foodHeroesStats: {
-        total: totalFoodHeroes,
-        volunteers: totalVolunteers,
-        recipients: totalRecipients,
-        admins: totalAdmins,
-        active: totalActiveFoodHeroes,
-        participationRate: totalFoodHeroes > 0 ? Math.round((totalActiveFoodHeroes / totalFoodHeroes) * 100) : 0
-      },
+      foodByActivityType,
       eventStats: {
         total: totalEvents,
         active: activeEvents,
-        completed: pastEvents,
+        completed: completedEvents,
         byType: eventsByType
       },
       qrStats: {
@@ -182,13 +275,14 @@ exports.getFoodHeroesImpact = async (req, res) => {
         totalScans: totalQRUsage[0]?.totalScans || 0,
         avgScansPerCode: totalQRCodes > 0 ? Math.round((totalQRUsage[0]?.totalScans || 0) / totalQRCodes * 100) / 100 : 0
       },
-      recentActivity: recentImpact,
+      recentActivity: recentParticipants,
       generatedAt: new Date(),
       fromCache: false,
-      calculationTime: Date.now() - startTime + 'ms'
+      calculationTime: `${calculationTime}ms`
     };
 
-    cache.set(cacheKey, responseData);
+    cache.set(cacheKey, responseData, 300);
+
     res.status(200).json(responseData);
 
   } catch (error) {
@@ -204,10 +298,16 @@ exports.getEventImpactAnalytics = async (req, res) => {
     }
 
     const cacheKey = 'eventImpactAnalytics';
-    const cachedData = cache.get(cacheKey);
+    let cachedData = cache.get(cacheKey);
     if (cachedData) {
-      return res.status(200).json(cachedData);
+      return res.status(200).json({
+        ...cachedData,
+        fromCache: true,
+        cachedAt: cachedData.generatedAt
+      });
     }
+
+    const startTime = Date.now();
 
     const eventImpacts = await Activity.aggregate([
       {
@@ -220,26 +320,87 @@ exports.getEventImpactAnalytics = async (req, res) => {
       },
       { $unwind: '$eventData' },
       {
+        $lookup: {
+          from: 'qrcodes',
+          localField: 'qrCode',
+          foreignField: '_id',
+          as: 'qrCodeData'
+        }
+      },
+      { $unwind: '$qrCodeData' },
+      {
         $group: {
-          _id: '$event',
+          _id: {
+            eventId: '$event',
+            qrType: '$qrCodeData.type'
+          },
           eventTitle: { $first: '$eventData.title' },
           eventDate: { $first: '$eventData.date' },
           eventLocation: { $first: '$eventData.location' },
           activityType: { $first: '$eventData.activityType' },
-          totalActivities: { $sum: 1 },
+          activities: { $sum: 1 },
+          uniqueUsers: { $addToSet: '$user' },
+          totalFoodProcessed: { $sum: '$quantity' },
           activitiesWithNFT: { 
             $sum: { $cond: [{ $ne: ['$nftId', null] }, 1, 0] } 
-          },
-          totalFoodRescued: { $sum: '$quantity' },
-          uniqueFoodHeroes: { $addToSet: '$user' }
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$_id.eventId',
+          eventTitle: { $first: '$eventTitle' },
+          eventDate: { $first: '$eventDate' },
+          eventLocation: { $first: '$eventLocation' },
+          activityType: { $first: '$activityType' },
+          breakdown: {
+            $push: {
+              type: '$_id.qrType',
+              activities: '$activities',
+              uniqueUsers: '$uniqueUsers',
+              uniqueUserCount: { $size: '$uniqueUsers' },
+              totalFood: '$totalFoodProcessed',
+              nftsMinted: '$activitiesWithNFT'
+            }
+          }
         }
       },
       {
         $addFields: {
-          uniqueFoodHeroesCount: { $size: '$uniqueFoodHeroes' },
+          volunteers: {
+            $arrayElemAt: [
+              { $filter: { input: '$breakdown', as: 'item', cond: { $eq: ['$$item.type', 'volunteer'] } } },
+              0
+            ]
+          },
+          recipients: {
+            $arrayElemAt: [
+              { $filter: { input: '$breakdown', as: 'item', cond: { $eq: ['$$item.type', 'recipient'] } } },
+              0
+            ]
+          }
+        }
+      },
+      {
+        $addFields: {
+          totalVolunteers: { $ifNull: ['$volunteers.uniqueUserCount', 0] },
+          totalRecipients: { $ifNull: ['$recipients.uniqueUserCount', 0] },
+          totalFoodRescued: { 
+            $add: [
+              { $ifNull: ['$volunteers.totalFood', 0] },
+              { $ifNull: ['$recipients.totalFood', 0] }
+            ]
+          },
+          totalActivities: { 
+            $add: [
+              { $ifNull: ['$volunteers.activities', 0] },
+              { $ifNull: ['$recipients.activities', 0] }
+            ]
+          },
+          totalNFTsMinted: { $ifNull: ['$volunteers.nftsMinted', 0] },
           totalRewards: {
             $multiply: [
-              '$activitiesWithNFT',
+              { $ifNull: ['$volunteers.nftsMinted', 0] },
               {
                 $switch: {
                   branches: [
@@ -251,18 +412,37 @@ exports.getEventImpactAnalytics = async (req, res) => {
                 }
               }
             ]
-          },
-          participationRate: {
-            $multiply: [
-              { $divide: ['$activitiesWithNFT', '$totalActivities'] },
-              100
-            ]
           }
         }
       },
       {
-        $project: {
-          uniqueFoodHeroes: 0 
+        $addFields: {
+          totalUniqueParticipants: {
+            $size: {
+              $reduce: {
+                input: '$breakdown',
+                initialValue: [],
+                in: { $setUnion: ['$$value', '$$this.uniqueUsers'] }
+              }
+            }
+          },
+          participationRate: {
+            $cond: [
+              { $gt: ['$totalActivities', 0] },
+              { 
+                $round: [
+                  { 
+                    $multiply: [
+                      { $divide: ['$totalNFTsMinted', '$totalActivities'] },
+                      100
+                    ]
+                  },
+                  1
+                ]
+              },
+              0
+            ]
+          }
         }
       },
       { $sort: { eventDate: -1 } }
@@ -270,28 +450,60 @@ exports.getEventImpactAnalytics = async (req, res) => {
 
     const totals = eventImpacts.reduce((acc, event) => {
       acc.totalEvents++;
+      acc.totalVolunteers += event.totalVolunteers;
+      acc.totalRecipients += event.totalRecipients;
       acc.totalActivities += event.totalActivities;
       acc.totalRewards += event.totalRewards;
       acc.totalFoodRescued += event.totalFoodRescued;
-      acc.totalNFTs += event.activitiesWithNFT;
-      acc.totalFoodHeroes += event.uniqueFoodHeroesCount;
+      acc.totalNFTs += event.totalNFTsMinted;
+      
+      acc.allParticipants = acc.allParticipants || new Set();
+      event.breakdown?.forEach(b => {
+        b.uniqueUsers?.forEach(user => acc.allParticipants.add(user.toString()));
+      });
+      
       return acc;
     }, {
       totalEvents: 0,
+      totalVolunteers: 0,
+      totalRecipients: 0,
       totalActivities: 0,
       totalRewards: 0,
       totalFoodRescued: 0,
-      totalNFTs: 0,
-      totalFoodHeroes: 0
+      totalNFTs: 0
     });
+
+    totals.totalUniqueParticipants = totals.allParticipants?.size || 0;
+    delete totals.allParticipants; 
+
+    const calculationTime = Date.now() - startTime;
 
     const responseData = {
       summary: totals,
-      eventImpacts,
-      generatedAt: new Date()
+      eventImpacts: eventImpacts.map(event => ({
+        _id: event._id,
+        eventTitle: event.eventTitle,
+        eventDate: event.eventDate,
+        eventLocation: event.eventLocation,
+        activityType: event.activityType,
+        totalVolunteers: event.totalVolunteers,
+        totalRecipients: event.totalRecipients,
+        totalUniqueParticipants: event.totalUniqueParticipants,
+        totalActivities: event.totalActivities,
+        totalFoodRescued: event.totalFoodRescued,
+        totalNFTsMinted: event.totalNFTsMinted,
+        totalRewards: event.totalRewards,
+        participationRate: event.participationRate,
+        volunteerDetails: event.volunteers || { uniqueUserCount: 0, activities: 0, totalFood: 0, nftsMinted: 0 },
+        recipientDetails: event.recipients || { uniqueUserCount: 0, activities: 0, totalFood: 0, nftsMinted: 0 }
+      })),
+      generatedAt: new Date(),
+      fromCache: false,
+      calculationTime: `${calculationTime}ms`
     };
 
-    cache.set(cacheKey, responseData);
+    cache.set(cacheKey, responseData, 300);
+
     res.status(200).json(responseData);
 
   } catch (error) {
