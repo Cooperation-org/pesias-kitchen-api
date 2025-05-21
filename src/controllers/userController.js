@@ -75,10 +75,18 @@ exports.updateUserRole = async (req, res) => {
   try {
     const { role } = req.body;
     
-    if (!role || !['volunteer', 'recipient', 'admin'].includes(role)) {
+    if (!role || !['volunteer', 'recipient', 'admin', 'superadmin'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
     
+    if (req.user.role === 'admin') {
+      if (role === 'admin' || role === 'superadmin') {
+        return res.status(403).json({ 
+          message: 'Only superadmins can assign admin or superadmin roles' 
+        });
+      }
+    }
+
     const user = await User.findByIdAndUpdate(
       req.params.userId,
       { $set: { role } },

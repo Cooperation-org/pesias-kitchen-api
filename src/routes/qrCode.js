@@ -7,7 +7,7 @@ const router = express.Router();
 router.post(
   '/generate',
   authenticate,
-  checkRole(['admin']),
+  checkRole(['admin', 'superadmin']),
   qrCodeController.generateQRCode
 );
 
