@@ -87,8 +87,9 @@ exports.updateUserRole = async (req, res) => {
       }
     }
 
-    const user = await User.findByIdAndUpdate(
-      req.params.userId,
+    const { walletAddress } = req.params;
+    const user = await User.findOneAndUpdate(
+      { walletAddress: walletAddress.toLowerCase() },
       { $set: { role } },
       { new: true }
     ).select('-nonce');
