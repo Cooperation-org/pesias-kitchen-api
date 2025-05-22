@@ -40,7 +40,7 @@ app.use('/api/pool', poolRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/rewards', rewardsRoutes);
 // app.use('/api/linkedtrust', linkedTrustRoutes);
-app.use('/api/analytics', analyticsRoutes);
+app.use('/api/stats', analyticsRoutes);
 
 
 

@@ -127,7 +127,7 @@ exports.getUserActivities = async (req, res) => {
 
 exports.getAllActivities = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
     
@@ -154,8 +154,9 @@ exports.getActivityById = async (req, res) => {
       return res.status(404).json({ message: 'Activity not found' });
     }
     
-    if (activity.user._id.toString() !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized' });
+    if (activity.user._id.toString() !== req.user.userId && 
+    req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+    return res.status(403).json({ message: 'Not authorized' });
     }
     
     res.status(200).json(activity);

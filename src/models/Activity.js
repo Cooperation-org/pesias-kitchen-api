@@ -36,6 +36,14 @@ const activitySchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  rewardAmount: {
+    type: Number,
+    default: 0,
+  },
+  rewardClaimed: {
+    type: Boolean,
+    default: false,
+  },
   notes: String,
 });
 
