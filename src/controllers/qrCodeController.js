@@ -35,8 +35,18 @@ exports.generateQRCode = async (req, res) => {
       id: Math.random().toString(36).substring(2, 15) // Simple unique ID
     };
     
-    const qrImage = await qrcode.toDataURL(JSON.stringify(qrData));
+    // const qrImage = await qrcode.toDataURL(JSON.stringify(qrData));
     
+
+    // Create a URL that phones can open
+    const baseUrl = 'https://pesias-kitchen-app-brown.vercel.app';
+    const qrDataEncoded = encodeURIComponent(JSON.stringify(qrData));
+    const qrUrl = `${baseUrl}/custodial-scan?data=${qrDataEncoded}`;
+
+    // Generate QR code with the URL
+    const qrImage = await qrcode.toDataURL(qrUrl);
+
+
     const ipfsCid = await uploadToIPFS(qrImage);
     
     const newQRCode = new QRCode({

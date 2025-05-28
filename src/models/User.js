@@ -20,6 +20,25 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  isCustodial: {
+  type: Boolean,
+  default: false,
+  },
+  phoneNumber: {
+    type: String,
+    sparse: true,
+    trim: true,
+  },
+  email: {
+    type: String,
+    sparse: true,
+    lowercase: true,
+    trim: true,
+  },
+  claimedAt: {
+    type: Date,
+    default: null,
+  },
   activities: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Activity',
