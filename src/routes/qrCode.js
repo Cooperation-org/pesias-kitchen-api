@@ -12,6 +12,6 @@ router.post(
 );
 
 router.post('/verify', authenticate, qrCodeController.verifyQRCode);
-router.post('/verify-and-mint', authenticate, qrCodeController.verifyQRAndMintNFT);
+// router.post('/verify-and-mint', authenticate, qrCodeController.verifyQRAndMintNFT);
 
 module.exports = router;
