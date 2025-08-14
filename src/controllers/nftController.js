@@ -36,12 +36,48 @@ exports.getNFTDetails = async (req, res) => {
       default: rewardAmount = 1;
     }
     
-    // Use Food Rescue Hero badge from env
-    const imageUrl = process.env.NFT_IMAGE_URL;
+    let title, heroStatus, imageUrl;
+    switch (activity.event.activityType) {
+      case 'food_sorting':
+        title = 'Food Sorting Hero';
+        heroStatus = 'Food Sorting Hero';
+        imageUrl = process.env.NFT_IMAGE_URL_SORTING || process.env.NFT_IMAGE_URL;
+        break;
+      case 'food_distribution':
+        title = 'Distribution Champion';
+        heroStatus = 'Distribution Champion';
+        imageUrl = process.env.NFT_IMAGE_URL_DISTRIBUTION || process.env.NFT_IMAGE_URL;
+        break;
+      case 'food_pickup':
+        title = 'Pickup Specialist';
+        heroStatus = 'Pickup Specialist';
+        imageUrl = process.env.NFT_IMAGE_URL_PICKUP || process.env.NFT_IMAGE_URL;
+        break;
+      default:
+        title = 'Food Rescue Hero';
+        heroStatus = 'Food Rescue Hero';
+        imageUrl = process.env.NFT_IMAGE_URL;
+    }
     
+    // Use the same powerful descriptions as IPFS metadata
+    let description;
+    switch (activity.event.activityType) {
+      case 'food_sorting':
+        description = 'A badge of honor for those who transform chaos into hope - organizing rescued food so families can be fed instead of landfills filled. No one should go hungry.';
+        break;
+      case 'food_distribution':
+        description = 'Recognition for heroes who bridge the gap between abundance and need - directly delivering meals to families facing food insecurity. We deliver hope, not just food.';
+        break;
+      case 'food_pickup':
+        description = 'Honoring the frontline warriors who intercept perfectly good food from waste streams and give it a second chance to nourish communities. Rescuing food, fighting hunger.';
+        break;
+      default:
+        description = 'Food rescue activity NFT for volunteers who help rescue food from waste. Thank you for being a Food Rescue Hero!';
+    }
+
     const nftMetadata = {
-      name: `Pesia's Kitchen - Food Rescue Hero`,
-      description: `Food rescue activity: ${activity.event.activityType.replace('_', ' ')} at ${activity.event.location} with quantity ${activity.quantity}kg. Thank you for being a Food Rescue Hero!`,
+      name: `Pesia's Kitchen - ${title}`,
+      description: description,
       image: imageUrl, // IPFS image URL
       attributes: [
         { trait_type: 'Activity Type', value: activity.event.activityType.replace('_', ' ') },
@@ -49,7 +85,7 @@ exports.getNFTDetails = async (req, res) => {
         { trait_type: 'Quantity', value: `${activity.quantity} kg` },
         { trait_type: 'Date', value: new Date(activity.timestamp).toISOString().split('T')[0] },
         { trait_type: 'Reward', value: `${rewardAmount} G$` },
-        { trait_type: 'Hero Status', value: 'Food Rescue Hero' }
+        { trait_type: 'Hero Status', value: heroStatus }
       ]
     };
     
@@ -65,17 +101,14 @@ exports.getNFTImage = async (req, res) => {
   try {
     const { nftId } = req.params;
     
-    console.log('Requesting image for NFT ID:', nftId); // Add logging
     
     const activity = await Activity.findOne({ nftId })
       .populate('event');
     
     if (!activity) {
-      console.log('Activity not found for NFT ID:', nftId); // Add logging
       return res.status(404).json({ message: 'NFT not found' });
     }
     
-    console.log('Activity found:', activity.event.activityType); // Add logging
     
     let color;
     switch (activity.event.activityType) {
@@ -122,7 +155,6 @@ exports.getNFTImage = async (req, res) => {
       </svg>
     `;
     
-    console.log('Sending SVG image'); // Add logging
     res.setHeader('Content-Type', 'image/svg+xml');
     res.send(svgImage);
   } catch (error) {
