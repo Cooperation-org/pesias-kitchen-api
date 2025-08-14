@@ -84,11 +84,46 @@ exports.verifyQRCode = async (req, res) => {
   try {
     const { qrData } = req.body;
     
+    
     if (!qrData) {
       return res.status(400).json({ message: 'QR data is required' });
     }
     
-    const parsedData = JSON.parse(qrData);
+    let parsedData;
+    
+    // Handle different QR data formats
+    let qrString;
+    if (typeof qrData === 'string') {
+      qrString = qrData;
+    } else if (Array.isArray(qrData) && qrData.length > 0) {
+      // Handle QR scanner result arrays - use first result
+      const firstResult = qrData[0];
+      qrString = firstResult.rawValue || firstResult.text || firstResult.data || JSON.stringify(firstResult);
+    } else if (qrData && typeof qrData === 'object') {
+      // Handle QR scanner result objects with rawValue property
+      qrString = qrData.rawValue || qrData.text || qrData.data || JSON.stringify(qrData);
+    } else {
+      qrString = String(qrData);
+    }
+    
+    
+    try {
+      // Handle URL-encoded QR codes (custodial scan)
+      if (qrString.startsWith('http')) {
+        const url = new URL(qrString);
+        const encodedData = url.searchParams.get('data');
+        if (!encodedData) {
+          return res.status(400).json({ message: 'No data parameter found in QR URL' });
+        }
+        const decodedData = decodeURIComponent(encodedData);
+        parsedData = JSON.parse(decodedData);
+      } else {
+        // Handle direct JSON QR codes (in-app scan)
+        parsedData = JSON.parse(qrString);
+      }
+    } catch (error) {
+      return res.status(400).json({ message: 'Invalid QR code format: ' + error.message });
+    }
     
     if (!parsedData.id || !parsedData.eventId) {
       return res.status(400).json({ message: 'Invalid QR code format' });
@@ -162,7 +197,39 @@ exports.verifyQRAndMintNFT = async (req, res) => {
       return res.status(400).json({ message: 'QR data is required' });
     }
     
-    const parsedData = JSON.parse(qrData);
+    let parsedData;
+    
+    // Handle different QR data formats
+    let qrString;
+    if (typeof qrData === 'string') {
+      qrString = qrData;
+    } else if (Array.isArray(qrData) && qrData.length > 0) {
+      // Handle QR scanner result arrays - use first result
+      const firstResult = qrData[0];
+      qrString = firstResult.rawValue || firstResult.text || firstResult.data || JSON.stringify(firstResult);
+    } else if (qrData && typeof qrData === 'object') {
+      // Handle QR scanner result objects with rawValue property
+      qrString = qrData.rawValue || qrData.text || qrData.data || JSON.stringify(qrData);
+    } else {
+      qrString = String(qrData);
+    }
+    
+    try {
+      // Handle URL-encoded QR codes (custodial scan)
+      if (qrString.startsWith('http')) {
+        const url = new URL(qrString);
+        const encodedData = url.searchParams.get('data');
+        if (!encodedData) {
+          return res.status(400).json({ message: 'No data parameter found in QR URL' });
+        }
+        parsedData = JSON.parse(decodeURIComponent(encodedData));
+      } else {
+        // Handle direct JSON QR codes (in-app scan)
+        parsedData = JSON.parse(qrString);
+      }
+    } catch (error) {
+      return res.status(400).json({ message: 'Invalid QR code format: ' + error.message });
+    }
     
     if (!parsedData.id || !parsedData.eventId) {
       return res.status(400).json({ message: 'Invalid QR code format' });

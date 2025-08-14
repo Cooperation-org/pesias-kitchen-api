@@ -21,6 +21,11 @@ const app = express();
 
 app.use(helmet());
 app.use(cors());
+
+// app.use(cors({
+//   origin: true, 
+//   credentials: true
+// }));
 app.use(express.json());
 
 connectDB()
@@ -31,6 +36,9 @@ connectDB()
     console.error('Could not connect to MongoDB:', err);
     process.exit(1);
   });
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static('uploads'));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/qr', qrCodeRoutes);

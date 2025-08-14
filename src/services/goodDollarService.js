@@ -2,9 +2,7 @@ const { ethers } = require('ethers');
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-const chainId = process.env.CHAIN_ID ? parseInt(process.env.CHAIN_ID) : 42220;
-
-
+const chainId = process.env.CHAIN_ID ? parseInt(process.env.CHAIN_ID) : 42220; // Celo Mainnet
 
 exports.mintNFT = async (userWallet, activityType, location, quantity, activityId) => {
   try {
@@ -23,12 +21,8 @@ exports.mintNFT = async (userWallet, activityType, location, quantity, activityI
     });
     
     const poolAddress = process.env.POOL_ADDRESS;
-
-  
     const poolContract = sdk.pool.attach(poolAddress);
-    
     const settings = await poolContract.settings();
-    
     const contractWithSigner = poolContract.connect(wallet);
 
     let rewardAmount;
@@ -43,17 +37,34 @@ exports.mintNFT = async (userWallet, activityType, location, quantity, activityI
       const timestamp = Math.floor(Date.now() / 1000);
       ethers.utils.parseEther(rewardAmount.toString());
 
+      let metadataUrl;
+      switch (activityType) {
+        case 'food_sorting':
+          metadataUrl = process.env.NFT_METADATA_URL_SORTING || process.env.NFT_METADATA_URL;
+          break;
+        case 'food_distribution':
+          metadataUrl = process.env.NFT_METADATA_URL_DISTRIBUTION || process.env.NFT_METADATA_URL;
+          break;
+        case 'food_pickup':
+          metadataUrl = process.env.NFT_METADATA_URL_PICKUP || process.env.NFT_METADATA_URL;
+          break;
+        default:
+          metadataUrl = process.env.NFT_METADATA_URL;
+      }
+
       const nftData = {
         nftType: settings.nftType,
         version: 1,
-        nftUri: `https://pesias-kitchen.org/activities/${activityId}`,
+        // Use activity-specific metadata
+        nftUri: metadataUrl,
         events: [
           {
             subtype: subtype,
             timestamp: timestamp,
             location: location,
             quantity: 1,
-            eventUri: `https://pesias-kitchen.org/events/${activityId}`,
+            // Use activity-specific metadata for event too
+            eventUri: metadataUrl,
             contributers: [userWallet], 
             rewardOverride: 0
           }
@@ -69,8 +80,23 @@ exports.mintNFT = async (userWallet, activityType, location, quantity, activityI
       
       const receipt = await tx.wait();
       
+      // Extract real NFT token ID from transaction events
+      let tokenId = null;
+      if (receipt.events) {
+        const transferEvent = receipt.events.find(event => 
+          event.event === 'Transfer' && event.args && event.args.tokenId
+        );
+        if (transferEvent) {
+          tokenId = transferEvent.args.tokenId.toString();
+        }
+      }
+      
+      // Fallback: use transaction hash if can't find token ID
+      const nftId = tokenId || `token-${receipt.transactionHash}`;
+      
       return {
-        nftId,
+        nftId: nftId,
+        tokenId: tokenId, // Real blockchain token ID
         txHash: receipt.transactionHash,
         rewardAmount,
         fromPool: true
@@ -99,16 +125,53 @@ exports.mintNFT = async (userWallet, activityType, location, quantity, activityI
       
       const receipt = await tx.wait();
       
-      const nftId = `nft-${receipt.transactionHash}`;
+      // For G$ transfers, we don't have a real NFT token ID, so use transaction hash
+      const nftId = `token-${receipt.transactionHash}`;
       
       return {
         nftId,
+        tokenId: null, // No real token ID for G$ transfers
         txHash: receipt.transactionHash,
         rewardAmount,
         fromPool: false
       };
     }
   } catch (error) {
+    throw error;
+  }
+};
+
+exports.getNFTDetails = async (tokenId) => {
+  try {
+    const { GoodCollectiveSDK } = await import('@gooddollar/goodcollective-sdk');
+    
+    const sdk = new GoodCollectiveSDK(chainId.toString(), provider, {
+      network: "development-celo"
+    });
+    
+    const poolAddress = process.env.POOL_ADDRESS;
+    const poolContract = sdk.pool.attach(poolAddress);
+    
+    // Get NFT details from blockchain
+    const nftData = await poolContract.getNFTData(tokenId);
+    
+    return {
+      tokenId: tokenId,
+      nftType: nftData.nftType.toString(),
+      version: nftData.version,
+      nftUri: nftData.nftUri,
+      events: nftData.events.map(event => ({
+        subtype: event.subtype,
+        timestamp: event.timestamp.toString(),
+        location: event.location,
+        quantity: event.quantity.toString(),
+        eventUri: event.eventUri,
+        contributers: event.contributers,
+        rewardOverride: event.rewardOverride.toString()
+      }))
+    };
+  } catch (error) {
+    console.error('Error fetching NFT details:', error);
     throw error;
   }
 };

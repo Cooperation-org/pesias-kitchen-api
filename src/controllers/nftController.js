@@ -1,5 +1,20 @@
 
 const Activity = require('../models/Activity');
+const fs = require('fs');
+const path = require('path');
+
+// Function to convert the nft.png to base64 data URI for on-chain storage
+const getNFTImageDataUri = () => {
+  try {
+    const imagePath = path.join(__dirname, '../../uploads/nft.png');
+    const imageBuffer = fs.readFileSync(imagePath);
+    const base64Image = imageBuffer.toString('base64');
+    return `data:image/png;base64,${base64Image}`;
+  } catch (error) {
+    console.error('Error reading NFT image:', error);
+    return null;
+  }
+};
 
 exports.getNFTDetails = async (req, res) => {
   try {
@@ -21,20 +36,57 @@ exports.getNFTDetails = async (req, res) => {
       default: rewardAmount = 1;
     }
     
+    let title, heroStatus, imageUrl;
+    switch (activity.event.activityType) {
+      case 'food_sorting':
+        title = 'Food Sorting Hero';
+        heroStatus = 'Food Sorting Hero';
+        imageUrl = process.env.NFT_IMAGE_URL_SORTING || process.env.NFT_IMAGE_URL;
+        break;
+      case 'food_distribution':
+        title = 'Distribution Champion';
+        heroStatus = 'Distribution Champion';
+        imageUrl = process.env.NFT_IMAGE_URL_DISTRIBUTION || process.env.NFT_IMAGE_URL;
+        break;
+      case 'food_pickup':
+        title = 'Pickup Specialist';
+        heroStatus = 'Pickup Specialist';
+        imageUrl = process.env.NFT_IMAGE_URL_PICKUP || process.env.NFT_IMAGE_URL;
+        break;
+      default:
+        title = 'Food Rescue Hero';
+        heroStatus = 'Food Rescue Hero';
+        imageUrl = process.env.NFT_IMAGE_URL;
+    }
+    
+    // Use the same powerful descriptions as IPFS metadata
+    let description;
+    switch (activity.event.activityType) {
+      case 'food_sorting':
+        description = 'A badge of honor for those who transform chaos into hope - organizing rescued food so families can be fed instead of landfills filled. No one should go hungry.';
+        break;
+      case 'food_distribution':
+        description = 'Recognition for heroes who bridge the gap between abundance and need - directly delivering meals to families facing food insecurity. We deliver hope, not just food.';
+        break;
+      case 'food_pickup':
+        description = 'Honoring the frontline warriors who intercept perfectly good food from waste streams and give it a second chance to nourish communities. Rescuing food, fighting hunger.';
+        break;
+      default:
+        description = 'Food rescue activity NFT for volunteers who help rescue food from waste. Thank you for being a Food Rescue Hero!';
+    }
+
     const nftMetadata = {
-      id: activity.nftId,
-      name: `Pesia's Kitchen - ${activity.event.activityType.replace('_', ' ')}`,
-      description: `Food rescue activity at ${activity.event.location} with quantity ${activity.quantity}kg`,
-      image: `${req.protocol}://${req.get('host')}/api/nft/${activity.nftId}/image`,
+      name: `Pesia's Kitchen - ${title}`,
+      description: description,
+      image: imageUrl, // IPFS image URL
       attributes: [
         { trait_type: 'Activity Type', value: activity.event.activityType.replace('_', ' ') },
         { trait_type: 'Location', value: activity.event.location },
         { trait_type: 'Quantity', value: `${activity.quantity} kg` },
         { trait_type: 'Date', value: new Date(activity.timestamp).toISOString().split('T')[0] },
-        { trait_type: 'Reward', value: `${rewardAmount} G$` }
-      ],
-      txHash: activity.txHash || 'mock-transaction',
-      owner: activity.user.walletAddress
+        { trait_type: 'Reward', value: `${rewardAmount} G$` },
+        { trait_type: 'Hero Status', value: heroStatus }
+      ]
     };
     
     res.status(200).json(nftMetadata);
@@ -44,9 +96,11 @@ exports.getNFTDetails = async (req, res) => {
   }
 };
 
+
 exports.getNFTImage = async (req, res) => {
   try {
     const { nftId } = req.params;
+    
     
     const activity = await Activity.findOne({ nftId })
       .populate('event');
@@ -55,12 +109,13 @@ exports.getNFTImage = async (req, res) => {
       return res.status(404).json({ message: 'NFT not found' });
     }
     
+    
     let color;
     switch (activity.event.activityType) {
       case 'food_sorting': color = '#4CAF50'; break; 
       case 'food_distribution': color = '#2196F3'; break; 
       case 'food_pickup': color = '#FF9800'; break; 
-      default: color = '#9C27B0'; e
+      default: color = '#9C27B0'; break; // Make sure this has break;
     }
     
     const svgImage = `
@@ -76,7 +131,7 @@ exports.getNFTImage = async (req, res) => {
         <!-- Activity Type -->
         <text x="250" y="140" font-family="Arial" font-size="22" font-weight="bold" text-anchor="middle" fill="#333">${activity.event.activityType.replace('_', ' ').toUpperCase()}</text>
         
-        <!-- Icon (simplified) -->
+        <!-- Icon -->
         <circle cx="250" cy="200" r="50" fill="${color}" opacity="0.2"/>
         <text x="250" y="215" font-family="Arial" font-size="32" text-anchor="middle" fill="${color}">🥫</text>
         
