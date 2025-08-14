@@ -66,8 +66,6 @@ app.get('/', (req, res) => {
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: 'Internal Server Error' });
-  console.log(`${req.method} ${req.path} from ${req.get('origin')}`);
-  next();
 });
 
 module.exports = app;

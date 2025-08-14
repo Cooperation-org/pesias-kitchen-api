@@ -37,19 +37,34 @@ exports.mintNFT = async (userWallet, activityType, location, quantity, activityI
       const timestamp = Math.floor(Date.now() / 1000);
       ethers.utils.parseEther(rewardAmount.toString());
 
+      let metadataUrl;
+      switch (activityType) {
+        case 'food_sorting':
+          metadataUrl = process.env.NFT_METADATA_URL_SORTING || process.env.NFT_METADATA_URL;
+          break;
+        case 'food_distribution':
+          metadataUrl = process.env.NFT_METADATA_URL_DISTRIBUTION || process.env.NFT_METADATA_URL;
+          break;
+        case 'food_pickup':
+          metadataUrl = process.env.NFT_METADATA_URL_PICKUP || process.env.NFT_METADATA_URL;
+          break;
+        default:
+          metadataUrl = process.env.NFT_METADATA_URL;
+      }
+
       const nftData = {
         nftType: settings.nftType,
         version: 1,
-        // Use Food Rescue Hero NFT metadata from env
-        nftUri: process.env.NFT_METADATA_URL,
+        // Use activity-specific metadata
+        nftUri: metadataUrl,
         events: [
           {
             subtype: subtype,
             timestamp: timestamp,
             location: location,
             quantity: 1,
-            // Use Food Rescue Hero NFT metadata for event too
-            eventUri: process.env.NFT_METADATA_URL,
+            // Use activity-specific metadata for event too
+            eventUri: metadataUrl,
             contributers: [userWallet], 
             rewardOverride: 0
           }
