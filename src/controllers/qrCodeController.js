@@ -39,7 +39,7 @@ exports.generateQRCode = async (req, res) => {
     
 
     // Create a URL that phones can open - now points to anonymous scan
-    const baseUrl = process.env.FRONTEND_URL || 'http://192.168.100.7:3000';
+    const baseUrl = process.env.FRONTEND_URL || 'https://pesias-kitchen-app-brown.vercel.app';
     const qrDataEncoded = encodeURIComponent(JSON.stringify(qrData));
     const qrUrl = `${baseUrl}/wallet-scan?data=${qrDataEncoded}`;
 
