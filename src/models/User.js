@@ -20,24 +20,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  isCustodial: {
-  type: Boolean,
-  default: false,
+  isAnonymous: {
+    type: Boolean,
+    default: false,
   },
-  phoneNumber: {
+  walletProvider: {
     type: String,
-    sparse: true,
-    trim: true,
-  },
-  email: {
-    type: String,
-    sparse: true,
-    lowercase: true,
-    trim: true,
-  },
-  claimedAt: {
-    type: Date,
-    default: null,
+    enum: ['dynamic', 'external'],
+    default: 'external',
   },
   activities: [{
     type: mongoose.Schema.Types.ObjectId,

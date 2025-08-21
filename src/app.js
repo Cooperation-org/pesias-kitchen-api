@@ -13,7 +13,7 @@ const poolRoutes = require('./routes/pool');
 const nftRoutes = require('./routes/nft');
 const rewardsRoutes = require('./routes/rewards');
 const analyticsRoutes= require('./routes/analytics')
-const custodialRoutes = require('./routes/custodial');
+const walletRoutes = require('./routes/wallet');
 
 
 
@@ -49,7 +49,7 @@ app.use('/api/pool', poolRoutes);
 app.use('/api/nft', nftRoutes);
 app.use('/api/rewards', rewardsRoutes);
 app.use('/api/stats', analyticsRoutes);
-app.use('/api/custodial', custodialRoutes);
+app.use('/api/wallet', walletRoutes);
 
 
 

@@ -33,3 +33,6 @@ build/
 *.swp
 *.swo
 .DS_Store
+
+# Admin scripts with sensitive data
+grant-admin.js
