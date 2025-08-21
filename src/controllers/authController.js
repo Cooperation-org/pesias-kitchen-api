@@ -46,7 +46,7 @@ exports.verifySignature = async (req, res) => {
     }
     
     // Verify the signature properly for production
-    const message = `Welcome to Pesia's Kitchen! Please confirm your identity: ${user.nonce}`;
+    const message = `Sign this message to authenticate with Pesia's Kitchen EAT Initiative: ${user.nonce}`;
     const isValid = await verifySignature(walletAddress, message, signature);
     
     if (!isValid) {
