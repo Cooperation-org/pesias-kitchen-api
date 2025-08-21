@@ -38,10 +38,10 @@ exports.generateQRCode = async (req, res) => {
     // const qrImage = await qrcode.toDataURL(JSON.stringify(qrData));
     
 
-    // Create a URL that phones can open
-    const baseUrl = 'https://pesias-kitchen-app-brown.vercel.app';
+    // Create a URL that phones can open - now points to anonymous scan
+    const baseUrl = process.env.FRONTEND_URL || 'http://192.168.100.7:3000';
     const qrDataEncoded = encodeURIComponent(JSON.stringify(qrData));
-    const qrUrl = `${baseUrl}/custodial-scan?data=${qrDataEncoded}`;
+    const qrUrl = `${baseUrl}/wallet-scan?data=${qrDataEncoded}`;
 
     // Generate QR code with the URL
     const qrImage = await qrcode.toDataURL(qrUrl);
