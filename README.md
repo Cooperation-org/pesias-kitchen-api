@@ -26,4 +26,4 @@ cp .env.example .env
 
 Start the development server
 
-npm run dev
+npm run dev# Force Vercel redeploy - Wed Sep  3 11:52:52 PM EAT 2025
