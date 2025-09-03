@@ -2,7 +2,7 @@
   "name": "pesias-kitchen-api",
   "version": "1.0.0",
   "description": "Backend service for Pesia's Kitchen EAT Initiative - handling food rescue volunteer verification, GoodDollar rewards distribution, and impact tracking.",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
