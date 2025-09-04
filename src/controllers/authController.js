@@ -77,3 +77,91 @@ exports.verifySignature = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+// Enhanced Dynamic authentication handler
+exports.authenticateDynamicUser = async (req, res) => {
+  try {
+    const { 
+      walletAddress, 
+      authMethod, 
+      userId, 
+      email, 
+      phone, 
+      passkeyId,
+      socialProvider 
+    } = req.body;
+
+    // Validate required fields
+    if (!walletAddress || !userId) {
+      return res.status(400).json({ 
+        error: 'Missing required authentication data' 
+      });
+    }
+
+    // Find or create user based on Dynamic user ID
+    let user = await User.findOne({ dynamicUserId: userId });
+    
+    if (!user) {
+      // Create new user with all available data
+      const userData = {
+        dynamicUserId: userId,
+        walletAddress: walletAddress.toLowerCase(),
+        email,
+        phone,
+        authMethods: authMethod ? [authMethod] : [],
+        passkeyId,
+        socialProvider,
+        isAnonymous: !email && !phone,
+        walletProvider: 'dynamic',
+        role: 'recipient',
+        name: email || `User-${walletAddress.slice(-8)}`,
+        nonce: uuidv4() // CRITICAL: Add required nonce field
+      };
+
+      user = new User(userData);
+      await user.save();
+    } else {
+      // Update existing user with new auth method if not already present
+      if (!user.authMethods.includes(authMethod)) {
+        user.authMethods.push(authMethod);
+      }
+      
+      // Update contact info if provided
+      if (email && !user.email) user.email = email;
+      if (phone && !user.phone) user.phone = phone;
+      if (passkeyId && !user.passkeyId) user.passkeyId = passkeyId;
+      
+      await user.save();
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        userId: user._id, 
+        dynamicUserId: userId,
+        walletAddress: user.walletAddress 
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        walletAddress: user.walletAddress,
+        email: user.email,
+        authMethods: user.authMethods,
+        hasPasskey: !!user.passkeyId
+      }
+    });
+
+  } catch (error) {
+    console.error('Dynamic auth error:', error);
+    res.status(500).json({ 
+      error: 'Authentication failed',
+      details: error.message 
+    });
+  }
+};
