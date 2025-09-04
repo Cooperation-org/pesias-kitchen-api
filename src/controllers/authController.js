@@ -91,10 +91,22 @@ exports.authenticateDynamicUser = async (req, res) => {
       socialProvider 
     } = req.body;
 
+    console.log('Dynamic auth request:', { 
+      walletAddress, 
+      authMethod, 
+      userId, 
+      email: email ? 'provided' : 'not provided',
+      phone: phone ? 'provided' : 'not provided',
+      passkeyId: passkeyId ? 'provided' : 'not provided',
+      socialProvider 
+    });
+
     // Validate required fields
     if (!walletAddress || !userId) {
       return res.status(400).json({ 
-        error: 'Missing required authentication data' 
+        success: false,
+        error: 'Missing required authentication data',
+        message: 'Wallet address and user ID are required for Dynamic authentication'
       });
     }
 
@@ -118,20 +130,53 @@ exports.authenticateDynamicUser = async (req, res) => {
         nonce: uuidv4() // CRITICAL: Add required nonce field
       };
 
+      console.log('Creating new Dynamic user:', { 
+        dynamicUserId: userId, 
+        walletAddress: walletAddress.toLowerCase(),
+        authMethod,
+        hasEmail: !!email,
+        hasPasskey: !!passkeyId
+      });
+
       user = new User(userData);
       await user.save();
     } else {
       // Update existing user with new auth method if not already present
-      if (!user.authMethods.includes(authMethod)) {
+      let updated = false;
+      
+      if (authMethod && !user.authMethods.includes(authMethod)) {
         user.authMethods.push(authMethod);
+        updated = true;
       }
       
       // Update contact info if provided
-      if (email && !user.email) user.email = email;
-      if (phone && !user.phone) user.phone = phone;
-      if (passkeyId && !user.passkeyId) user.passkeyId = passkeyId;
+      if (email && !user.email) {
+        user.email = email;
+        updated = true;
+      }
+      if (phone && !user.phone) {
+        user.phone = phone;
+        updated = true;
+      }
+      if (passkeyId && !user.passkeyId) {
+        user.passkeyId = passkeyId;
+        updated = true;
+      }
       
-      await user.save();
+      // Update last login time
+      user.lastLoginAt = new Date();
+      updated = true;
+      
+      if (updated) {
+        await user.save();
+      }
+      
+      console.log('Updated existing Dynamic user:', { 
+        dynamicUserId: userId, 
+        authMethods: user.authMethods,
+        hasEmail: !!user.email,
+        hasPasskey: !!user.passkeyId
+      });
     }
 
     // Generate JWT token
@@ -139,29 +184,47 @@ exports.authenticateDynamicUser = async (req, res) => {
       { 
         userId: user._id, 
         dynamicUserId: userId,
-        walletAddress: user.walletAddress 
+        walletAddress: user.walletAddress,
+        role: user.role 
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    res.json({
+    const response = {
       success: true,
       token,
       user: {
         id: user._id,
         walletAddress: user.walletAddress,
         email: user.email,
+        name: user.name,
+        role: user.role,
         authMethods: user.authMethods,
-        hasPasskey: !!user.passkeyId
-      }
+        hasPasskey: !!user.passkeyId,
+        isAnonymous: user.isAnonymous,
+        walletProvider: user.walletProvider
+      },
+      message: user.isAnonymous ? 
+        'Anonymous wallet authenticated successfully' : 
+        'User authenticated successfully'
+    };
+
+    console.log('Dynamic auth successful:', { 
+      userId: user._id, 
+      walletAddress: user.walletAddress,
+      hasPasskey: !!user.passkeyId 
     });
+
+    res.json(response);
 
   } catch (error) {
     console.error('Dynamic auth error:', error);
     res.status(500).json({ 
+      success: false,
       error: 'Authentication failed',
-      details: error.message 
+      message: 'Failed to authenticate with Dynamic SDK. Please try again.',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

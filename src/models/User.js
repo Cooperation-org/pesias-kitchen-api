@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema({
   // Authentication methods
   authMethods: [{ 
     type: String, 
-    enum: ['wallet', 'email', 'sms', 'passkey', 'social', 'biometric'],
+    enum: ['wallet', 'email', 'sms', 'passkey', 'social', 'biometric', 'embedded_wallet'],
     default: []
   }],
   
