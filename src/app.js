@@ -14,6 +14,7 @@ const nftRoutes = require('./routes/nft');
 const rewardsRoutes = require('./routes/rewards');
 const analyticsRoutes= require('./routes/analytics')
 const walletRoutes = require('./routes/wallet');
+const anonymousScanRoutes = require('./routes/anonymousScan');
 
 
 
@@ -50,6 +51,7 @@ app.use('/api/nft', nftRoutes);
 app.use('/api/rewards', rewardsRoutes);
 app.use('/api/stats', analyticsRoutes);
 app.use('/api/wallet', walletRoutes);
+app.use('/api/anonymous-scan', anonymousScanRoutes);
 
 
 
