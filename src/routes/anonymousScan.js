@@ -156,20 +156,24 @@ router.post('/', async (req, res) => {
       rewardAmount: activityData.rewardAmount
     });
 
-    // Trigger smart contract rewards to nonprofit wallet
+    // Trigger smart contract rewards and NFT minting to nonprofit wallet
     try {
-      await sendRewardsToNonprofit({
+      const rewardResult = await sendRewardsToNonprofit({
         walletAddress: NONPROFIT_WALLET_ADDRESS,
         amount: activityData.rewardAmount,
         activityType: qrData.type,
         eventTitle: event.title,
+        eventLocation: event.location,
         pseudonymousId: pseudonymousId.substring(0, 8) + '...' // Partial ID for logging
       });
 
-      console.log('Rewards sent to nonprofit wallet:', {
+      console.log('Rewards and NFT sent to nonprofit wallet:', {
         wallet: NONPROFIT_WALLET_ADDRESS,
         amount: activityData.rewardAmount,
-        event: event.title
+        event: event.title,
+        rewardTxHash: rewardResult.rewardTransactionHash,
+        nftTxHash: rewardResult.nftTransactionHash,
+        nftId: rewardResult.nftId
       });
     } catch (rewardError) {
       console.error('Reward distribution failed:', rewardError);
@@ -198,6 +202,7 @@ router.post('/', async (req, res) => {
       impact: {
         proofRecorded: true,
         rewardsSentToNonprofit: true,
+        nftMintedToNonprofit: true,
         nonprofitWallet: NONPROFIT_WALLET_ADDRESS.substring(0, 6) + '...'
       }
     };

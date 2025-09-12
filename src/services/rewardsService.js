@@ -71,13 +71,14 @@ function initializeRewardsService() {
 }
 
 /**
- * Send GoodDollar rewards to nonprofit wallet
+ * Send GoodDollar rewards and mint NFT to nonprofit wallet
  * @param {Object} params - Reward parameters
  * @param {string} params.walletAddress - Nonprofit wallet address
  * @param {number} params.amount - Reward amount in G$ tokens
  * @param {string} params.activityType - Type of activity (volunteer/recipient)
  * @param {string} params.eventTitle - Event title for metadata
  * @param {string} params.pseudonymousId - Partial pseudonymous ID for tracking
+ * @param {string} params.eventLocation - Event location for NFT metadata
  * @returns {Object} Transaction result
  */
 async function sendRewardsToNonprofit(params) {
@@ -86,11 +87,12 @@ async function sendRewardsToNonprofit(params) {
     amount,
     activityType,
     eventTitle,
-    pseudonymousId
+    pseudonymousId,
+    eventLocation = 'Community Impact Event'
   } = params;
 
   try {
-    logger.info('Initiating reward distribution:', {
+    logger.info('Initiating reward and NFT distribution:', {
       recipient: walletAddress,
       amount,
       activityType,
@@ -124,21 +126,60 @@ async function sendRewardsToNonprofit(params) {
     };
 
     // Execute reward distribution
-    const result = await sdk.distributeRewards(rewardParams);
+    const rewardResult = await sdk.distributeRewards(rewardParams);
 
-    logger.info('Rewards distributed successfully:', {
-      txHash: result.transactionHash,
-      blockNumber: result.blockNumber,
-      gasUsed: result.gasUsed,
+    // Mint NFT to nonprofit wallet
+    let nftResult = null;
+    try {
+      const { mintNFT } = require('./goodDollarService');
+      
+      // Map activity types to NFT-compatible types
+      let nftActivityType = 'food_distribution'; // default
+      switch (activityType) {
+        case 'volunteer':
+          nftActivityType = 'food_sorting';
+          break;
+        case 'recipient':
+          nftActivityType = 'food_pickup';
+          break;
+        default:
+          nftActivityType = 'food_distribution';
+      }
+
+      nftResult = await mintNFT(
+        walletAddress,
+        nftActivityType,
+        eventLocation,
+        1, // quantity
+        `anon-${pseudonymousId}` // activity ID
+      );
+
+      logger.info('NFT minted successfully:', {
+        nftId: nftResult.nftId,
+        tokenId: nftResult.tokenId,
+        txHash: nftResult.txHash,
+        recipient: walletAddress
+      });
+    } catch (nftError) {
+      logger.error('NFT minting failed:', nftError);
+      // Don't fail the entire request if NFT minting fails
+    }
+
+    logger.info('Rewards and NFT distributed successfully:', {
+      rewardTxHash: rewardResult.transactionHash,
+      nftTxHash: nftResult?.txHash,
       recipient: walletAddress,
       amount
     });
 
     return {
       success: true,
-      transactionHash: result.transactionHash,
-      blockNumber: result.blockNumber,
-      gasUsed: result.gasUsed,
+      rewardTransactionHash: rewardResult.transactionHash,
+      nftTransactionHash: nftResult?.txHash,
+      nftId: nftResult?.nftId,
+      tokenId: nftResult?.tokenId,
+      blockNumber: rewardResult.blockNumber,
+      gasUsed: rewardResult.gasUsed,
       amount,
       recipient: walletAddress
     };
