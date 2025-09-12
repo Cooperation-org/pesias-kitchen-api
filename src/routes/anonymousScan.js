@@ -4,10 +4,10 @@ const Event = require('../models/Event');
 const QRCode = require('../models/QRCode');
 const PseudonymousActivity = require('../models/PseudonymousActivity');
 const { calculateDistance } = require('../utils/geolocation');
-const { sendRewardsToNonprofit } = require('../services/rewardsService');
+const { mintNFT } = require('../services/goodDollarService');
 
 // Nonprofit wallet address for rewards
-const NONPROFIT_WALLET_ADDRESS = '0x187ff8e530DEFaC66e747C2bCEBcEA81B11FfC29';
+const NONPROFIT_WALLET_ADDRESS = '0xbB184005e695299fEffea43e3B2A3E5bCd81f22c';
 
 /**
  * Anonymous QR scan endpoint - no wallet connection required
@@ -72,6 +72,8 @@ router.post('/', async (req, res) => {
     }
 
     // Check for duplicate participation by pseudonymous ID + event
+    // COMMENTED OUT: Allow multiple scans for testing
+    /*
     const existingActivity = await PseudonymousActivity.findOne({
       pseudonymousId: pseudonymousId,
       eventId: qrData.eventId
@@ -94,6 +96,7 @@ router.post('/', async (req, res) => {
         }
       });
     }
+    */
 
     // Validate geolocation if event has location coordinates
     if (geolocation && event.coordinates) {
@@ -156,27 +159,46 @@ router.post('/', async (req, res) => {
       rewardAmount: activityData.rewardAmount
     });
 
-    // Trigger smart contract rewards and NFT minting to nonprofit wallet
+    // Mint NFT (and fallback G$ transfer on failure) to nonprofit wallet using the same flow as in-app
     try {
-      const rewardResult = await sendRewardsToNonprofit({
-        walletAddress: NONPROFIT_WALLET_ADDRESS,
-        amount: activityData.rewardAmount,
-        activityType: qrData.type,
-        eventTitle: event.title,
-        eventLocation: event.location,
-        pseudonymousId: pseudonymousId.substring(0, 8) + '...' // Partial ID for logging
-      });
+      // Map anonymous types to NFT activity subtypes similar to in-app
+      let nftActivityType = 'food_distribution';
+      switch (qrData.type) {
+        case 'volunteer':
+          nftActivityType = 'food_sorting';
+          break;
+        case 'recipient':
+          nftActivityType = 'food_pickup';
+          break;
+        default:
+          nftActivityType = 'food_distribution';
+      }
 
-      console.log('Rewards and NFT sent to nonprofit wallet:', {
+      const nftResult = await mintNFT(
+        NONPROFIT_WALLET_ADDRESS,
+        nftActivityType,
+        event.location,
+        1,
+        `anon-${pseudonymousId.substring(0, 8)}`,
+        {
+          pseudonymousId,
+          eventTitle: event.title,
+          activityType: qrData.type,
+          source: 'pseudonymous-scan'
+        }
+      );
+
+      console.log('Anonymous flow reward (NFT or G$ fallback) sent to nonprofit wallet:', {
         wallet: NONPROFIT_WALLET_ADDRESS,
         amount: activityData.rewardAmount,
         event: event.title,
-        rewardTxHash: rewardResult.rewardTransactionHash,
-        nftTxHash: rewardResult.nftTransactionHash,
-        nftId: rewardResult.nftId
+        nftTxHash: nftResult.txHash,
+        nftId: nftResult.nftId,
+        tokenId: nftResult.tokenId,
+        fromPool: nftResult.fromPool
       });
     } catch (rewardError) {
-      console.error('Reward distribution failed:', rewardError);
+      console.error('Anonymous reward mint/transfer failed:', rewardError);
       // Don't fail the entire request if rewards fail
       // The activity is still recorded for manual processing
     }
@@ -223,6 +245,51 @@ router.post('/', async (req, res) => {
       message: 'Internal server error. Please try again.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  }
+});
+
+/**
+ * Get activities by pseudonymous ID for tracing (admin only)
+ */
+router.get('/trace/:pseudonymousId', async (req, res) => {
+  try {
+    const { pseudonymousId } = req.params;
+    
+    // Validate pseudonymous ID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(pseudonymousId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid pseudonymous ID format'
+      });
+    }
+
+    const activities = await PseudonymousActivity.find({ pseudonymousId })
+      .populate('eventId', 'title location date')
+      .populate('qrCodeId', 'type')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      pseudonymousId,
+      activities: activities.map(activity => ({
+        id: activity._id,
+        eventTitle: activity.eventId?.title,
+        eventLocation: activity.eventId?.location,
+        eventDate: activity.eventId?.date,
+        activityType: activity.activityType,
+        quantity: activity.quantity,
+        rewardAmount: activity.rewardAmount,
+        timestamp: activity.createdAt,
+        geolocation: activity.geolocation,
+        ipAddress: activity.ipAddress?.substring(0, 8) + '...' // Partial IP for privacy
+      })),
+      totalActivities: activities.length,
+      totalRewards: activities.reduce((sum, activity) => sum + activity.rewardAmount, 0)
+    });
+  } catch (error) {
+    console.error('Trace error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch activities' });
   }
 });
 

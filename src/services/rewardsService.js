@@ -7,63 +7,34 @@ const { ethers } = require('ethers');
 const logger = require('../utils/logger');
 
 // Import GoodCollective SDK components
-// const { GoodCollectiveSDK } = require('@gooddollar/goodcollective-sdk');
+const { GoodCollectiveSDK } = require('@gooddollar/goodcollective-sdk');
 
 // Configuration
-const NONPROFIT_WALLET_ADDRESS = '0x187ff8e530DEFaC66e747C2bCEBcEA81B11FfC29';
+const NONPROFIT_WALLET_ADDRESS = '0xbB184005e695299fEffea43e3B2A3E5bCd81f22c';
 const CHAIN_ID = process.env.CHAIN_ID || '42220'; // Celo mainnet
 const RPC_URL = process.env.RPC_URL || 'https://forno.celo.org';
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
 
-// Mock implementation for development - replace with actual GoodCollective integration
-class MockGoodCollectiveSDK {
-  constructor(config) {
-    this.config = config;
-    logger.info('MockGoodCollectiveSDK initialized', { chainId: config.chainId });
-  }
-
-  async distributeRewards(params) {
-    // Mock transaction hash for development
-    const mockTxHash = '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
-    
-    logger.info('Mock reward distribution:', {
-      recipient: params.recipient,
-      amount: params.amount,
-      activityType: params.metadata?.activityType,
-      txHash: mockTxHash
-    });
-
-    // Simulate blockchain delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    return {
-      transactionHash: mockTxHash,
-      blockNumber: Math.floor(Math.random() * 1000000) + 20000000,
-      gasUsed: '21000',
-      status: 'confirmed'
-    };
-  }
+if (!PRIVATE_KEY) {
+  throw new Error('PRIVATE_KEY environment variable is required for real blockchain transactions');
 }
 
 /**
- * Initialize rewards service
+ * Initialize rewards service with direct blockchain connection
  */
 function initializeRewardsService() {
   try {
-    // In production, use actual GoodCollective SDK
-    // const sdk = new GoodCollectiveSDK({
-    //   chainId: CHAIN_ID,
-    //   rpcUrl: RPC_URL,
-    //   privateKey: process.env.REWARDS_PRIVATE_KEY
-    // });
+    // Use direct ethers provider for G$ token transfers
+    const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+    const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
-    // For development, use mock SDK
-    const sdk = new MockGoodCollectiveSDK({
+    logger.info('Real blockchain rewards service initialized successfully', {
       chainId: CHAIN_ID,
-      rpcUrl: RPC_URL
+      rpcUrl: RPC_URL,
+      walletAddress: wallet.address
     });
-
-    logger.info('Rewards service initialized successfully');
-    return sdk;
+    
+    return { provider, wallet };
   } catch (error) {
     logger.error('Failed to initialize rewards service:', error);
     throw error;
@@ -109,24 +80,32 @@ async function sendRewardsToNonprofit(params) {
       throw new Error('Invalid reward amount');
     }
 
-    // Initialize SDK
-    const sdk = initializeRewardsService();
+    // Initialize blockchain connection
+    const { provider, wallet } = initializeRewardsService();
 
-    // Prepare reward distribution parameters
-    const rewardParams = {
-      recipient: walletAddress,
-      amount: ethers.utils.parseUnits(amount.toString(), 18), // Convert to wei
-      metadata: {
-        activityType,
-        eventTitle,
-        pseudonymousId,
-        timestamp: new Date().toISOString(),
-        source: 'pseudonymous-scan'
-      }
+    // G$ Token contract address
+    const g$TokenAddress = '0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A';
+    const tokenContract = new ethers.Contract(
+      g$TokenAddress,
+      ['function transfer(address to, uint256 amount) returns (bool)'],
+      provider
+    );
+
+    // Execute G$ token transfer
+    const tx = await tokenContract.connect(wallet).transfer(
+      walletAddress,
+      ethers.utils.parseEther(amount.toString()),
+      { gasLimit: 300000 }
+    );
+    
+    const receipt = await tx.wait();
+    
+    const rewardResult = {
+      transactionHash: receipt.transactionHash,
+      blockNumber: receipt.blockNumber,
+      gasUsed: receipt.gasUsed.toString(),
+      status: receipt.status === 1 ? 'confirmed' : 'failed'
     };
-
-    // Execute reward distribution
-    const rewardResult = await sdk.distributeRewards(rewardParams);
 
     // Mint NFT to nonprofit wallet
     let nftResult = null;
@@ -151,7 +130,13 @@ async function sendRewardsToNonprofit(params) {
         nftActivityType,
         eventLocation,
         1, // quantity
-        `anon-${pseudonymousId}` // activity ID
+        `anon-${pseudonymousId}`, // activity ID
+        {
+          pseudonymousId: pseudonymousId,
+          eventTitle: eventTitle,
+          activityType: activityType,
+          timestamp: new Date().toISOString()
+        } // additional metadata for tracing
       );
 
       logger.info('NFT minted successfully:', {
