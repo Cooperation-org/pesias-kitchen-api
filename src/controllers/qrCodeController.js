@@ -35,14 +35,11 @@ exports.generateQRCode = async (req, res) => {
       id: Math.random().toString(36).substring(2, 15) // Simple unique ID
     };
     
-    // const qrImage = await qrcode.toDataURL(JSON.stringify(qrData));
+    // Create URL for anonymous scanning (phone camera → webpage)
+    const baseUrl = process.env.FRONTEND_URL || 'https://www.pesiaskitchen.org';
+    const qrDataEncoded = Buffer.from(JSON.stringify(qrData)).toString('base64');
+    const qrUrl = `${baseUrl}/anonymous-scan?qr=${qrDataEncoded}`;
     
-
-    // Create a URL that phones can open - now points to anonymous scan
-    const baseUrl = process.env.FRONTEND_URL || 'http://192.168.100.7:3000';
-    const qrDataEncoded = encodeURIComponent(JSON.stringify(qrData));
-    const qrUrl = `${baseUrl}/wallet-scan?data=${qrDataEncoded}`;
-
     // Generate QR code with the URL
     const qrImage = await qrcode.toDataURL(qrUrl);
 
@@ -111,11 +108,20 @@ exports.verifyQRCode = async (req, res) => {
       // Handle URL-encoded QR codes (custodial scan)
       if (qrString.startsWith('http')) {
         const url = new URL(qrString);
-        const encodedData = url.searchParams.get('data');
+        // Check for both 'qr' and 'data' parameters for backward compatibility
+        const encodedData = url.searchParams.get('qr') || url.searchParams.get('data');
         if (!encodedData) {
           return res.status(400).json({ message: 'No data parameter found in QR URL' });
         }
-        const decodedData = decodeURIComponent(encodedData);
+        // Handle base64 encoded data (new format) or URL encoded data (old format)
+        let decodedData;
+        try {
+          // Try base64 decode first (new format)
+          decodedData = Buffer.from(encodedData, 'base64').toString('utf-8');
+        } catch {
+          // Fall back to URL decode (old format)
+          decodedData = decodeURIComponent(encodedData);
+        }
         parsedData = JSON.parse(decodedData);
       } else {
         // Handle direct JSON QR codes (in-app scan)
