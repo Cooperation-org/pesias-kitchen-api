@@ -28,7 +28,11 @@ function getMetadataUrlForActivityType(activityType) {
 }
 
 // Configuration
-const NONPROFIT_WALLET_ADDRESS = '0xbB184005e695299fEffea43e3B2A3E5bCd81f22c';
+const NONPROFIT_WALLET_ADDRESS = process.env.NONPROFIT_WALLET_ADDRESS;
+
+if (!NONPROFIT_WALLET_ADDRESS) {
+  throw new Error('NONPROFIT_WALLET_ADDRESS environment variable is required');
+}
 const CHAIN_ID = process.env.CHAIN_ID || '42220'; // Celo mainnet
 const RPC_URL = process.env.RPC_URL || 'https://forno.celo.org';
 const PRIVATE_KEY = process.env.PRIVATE_KEY;

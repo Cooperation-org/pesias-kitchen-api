@@ -7,7 +7,11 @@ const { calculateDistance } = require('../utils/geolocation');
 const { mintNFT } = require('../services/goodDollarService');
 
 // Nonprofit wallet address for rewards
-const NONPROFIT_WALLET_ADDRESS = '0xbB184005e695299fEffea43e3B2A3E5bCd81f22c';
+const NONPROFIT_WALLET_ADDRESS = process.env.NONPROFIT_WALLET_ADDRESS;
+
+if (!NONPROFIT_WALLET_ADDRESS) {
+  throw new Error('NONPROFIT_WALLET_ADDRESS environment variable is required');
+}
 
 /**
  * Anonymous QR scan endpoint - no wallet connection required
@@ -72,8 +76,6 @@ router.post('/', async (req, res) => {
     }
 
     // Check for duplicate participation by pseudonymous ID + event
-    // COMMENTED OUT: Allow multiple scans for testing
-    /*
     const existingActivity = await PseudonymousActivity.findOne({
       pseudonymousId: pseudonymousId,
       eventId: qrData.eventId
@@ -96,7 +98,6 @@ router.post('/', async (req, res) => {
         }
       });
     }
-    */
 
     // Validate geolocation if event has location coordinates
     if (geolocation && event.coordinates) {
