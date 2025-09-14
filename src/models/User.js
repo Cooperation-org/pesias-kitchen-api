@@ -68,9 +68,6 @@ const userSchema = new mongoose.Schema({
   },
 });
 
-// Indexes for performance
-userSchema.index({ dynamicUserId: 1 });
-userSchema.index({ walletAddress: 1 });
-userSchema.index({ email: 1 });
+// Indexes are already defined via unique/sparse properties above
 
 module.exports = mongoose.model('User', userSchema);
