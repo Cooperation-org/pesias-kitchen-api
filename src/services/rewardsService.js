@@ -9,6 +9,24 @@ const logger = require('../utils/logger');
 // Import GoodCollective SDK components
 const { GoodCollectiveSDK } = require('@gooddollar/goodcollective-sdk');
 
+/**
+ * Get metadata URL for specific activity type (same as in-app scanner)
+ * @param {string} activityType - Activity type
+ * @returns {string} Metadata URL
+ */
+function getMetadataUrlForActivityType(activityType) {
+  switch (activityType) {
+    case 'food_sorting':
+      return process.env.NFT_METADATA_URL_SORTING || process.env.NFT_METADATA_URL;
+    case 'food_distribution':
+      return process.env.NFT_METADATA_URL_DISTRIBUTION || process.env.NFT_METADATA_URL;
+    case 'food_pickup':
+      return process.env.NFT_METADATA_URL_PICKUP || process.env.NFT_METADATA_URL;
+    default:
+      return process.env.NFT_METADATA_URL;
+  }
+}
+
 // Configuration
 const NONPROFIT_WALLET_ADDRESS = '0xbB184005e695299fEffea43e3B2A3E5bCd81f22c';
 const CHAIN_ID = process.env.CHAIN_ID || '42220'; // Celo mainnet
@@ -135,7 +153,9 @@ async function sendRewardsToNonprofit(params) {
           pseudonymousId: pseudonymousId,
           eventTitle: eventTitle,
           activityType: activityType,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          // Use the same metadata URLs as in-app scanner
+          metadataUrl: getMetadataUrlForActivityType(nftActivityType)
         } // additional metadata for tracing
       );
 
