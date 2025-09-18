@@ -177,12 +177,14 @@ exports.verifyQRCode = async (req, res) => {
         id: qrCode._id,
         type: qrCode.type,
         usedCount: qrCode.usedCount,
+        rewardAmount: event.rewardAmount || 1, // Add reward amount to response
         event: {
           id: event._id,
           title: event.title,
           activityType: event.activityType,
           location: event.location,
-          defaultQuantity: event.defaultQuantity || 1
+          defaultQuantity: event.defaultQuantity || 1,
+          rewardAmount: event.rewardAmount || 1 // Also add to event object
         }
       },
       context: qrCode.type === 'volunteer' 

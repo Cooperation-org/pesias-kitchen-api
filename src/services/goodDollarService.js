@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { ethers } = require('ethers');
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
@@ -17,7 +18,11 @@ exports.mintNFT = async (userWallet, activityType, location, quantity, activityI
     const { GoodCollectiveSDK } = await import('@gooddollar/goodcollective-sdk');
     
     const sdk = new GoodCollectiveSDK(chainId.toString(), provider, {
-      network: "development-celo"
+      network: "development-celo",
+      contracts: {
+        DirectPaymentsFactory: process.env.LOCAL_DIRECT_PAYMENTS_FACTORY || '0x998abeb3E57409262aE5b751f60747921B33613E',
+        UBIPoolFactory: process.env.LOCAL_UBI_POOL_FACTORY || '0x0E801D84Fa97b50751Dbf25036d067dCf18858bF'
+      }
     });
     
     const poolAddress = process.env.POOL_ADDRESS;
@@ -97,13 +102,15 @@ exports.mintNFT = async (userWallet, activityType, location, quantity, activityI
       // Fallback: use transaction hash if can't find token ID
       const nftId = tokenId || `token-${receipt.transactionHash}`;
       
-      return {
+      const result = {
         nftId: nftId,
         tokenId: tokenId, // Real blockchain token ID
         txHash: receipt.transactionHash,
         rewardAmount,
         fromPool: true
       };
+      
+      return result;
     } catch (error) {
       let rewardAmount;
       switch (activityType) {
@@ -149,7 +156,11 @@ exports.getNFTDetails = async (tokenId) => {
     const { GoodCollectiveSDK } = await import('@gooddollar/goodcollective-sdk');
     
     const sdk = new GoodCollectiveSDK(chainId.toString(), provider, {
-      network: "development-celo"
+      network: "development-celo",
+      contracts: {
+        DirectPaymentsFactory: process.env.LOCAL_DIRECT_PAYMENTS_FACTORY || '0x998abeb3E57409262aE5b751f60747921B33613E',
+        UBIPoolFactory: process.env.LOCAL_UBI_POOL_FACTORY || '0x0E801D84Fa97b50751Dbf25036d067dCf18858bF'
+      }
     });
     
     const poolAddress = process.env.POOL_ADDRESS;

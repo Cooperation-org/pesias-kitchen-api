@@ -4,6 +4,7 @@ const { getWalletProvider } = require('../services/walletService');
 const Activity = require('../models/Activity');
 const Event = require('../models/Event');
 const QRCode = require('../models/QRCode');
+const { mintNFT } = require('../services/goodDollarService');
 
 router.post('/scan-qr', async (req, res) => {
   try {
@@ -72,21 +73,26 @@ router.post('/scan-qr', async (req, res) => {
       event: event._id,
       qrCode: qrCode._id,
       quantity: qrData.quantity || event.defaultQuantity || 1,
-      notes: qrData.notes || `${provider} wallet participation`
+      notes: qrData.notes || `${provider} wallet participation`,
+      rewardAmount: event.rewardAmount || 1 // Store the actual reward amount
     });
 
     await activity.save();
     user.activities.push(activity._id);
     await user.save();
 
+    // Activity recorded successfully - user can claim rewards later
+
     // Success response
     return res.json({
       success: true,
       provider: provider,
       isNewUser: isNew,
-      message: isNew ? 
-        `Welcome! Your ${provider} wallet has been connected and activity recorded.` : 
-        `Welcome back! Activity recorded successfully.`,
+      message: qrCode.type === 'volunteer' ? 
+        `Welcome! Your ${provider} wallet has been connected and activity recorded. You can now claim your G$ rewards!` : 
+        isNew ? 
+          `Welcome! Your ${provider} wallet has been connected and activity recorded.` : 
+          `Welcome back! Activity recorded successfully.`,
       user: {
         id: user._id,
         walletAddress: user.walletAddress,
@@ -102,7 +108,8 @@ router.post('/scan-qr', async (req, res) => {
         rewardAmount: event.rewardAmount || 1,
         eventTitle: event.title,
         eventLocation: event.location,
-        timestamp: activity.createdAt
+        timestamp: activity.createdAt,
+        canClaimReward: qrCode.type === 'volunteer'
       },
       event: {
         id: event._id,
