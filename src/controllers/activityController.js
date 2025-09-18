@@ -25,12 +25,31 @@ exports.recordActivity = async (req, res) => {
       return res.status(404).json({ message: 'QR code not found' });
     }
     
+    // Check for duplicate participation - prevent recording same activity twice
+    const existingActivity = await Activity.findOne({
+      user: req.user.userId,
+      event: eventId
+    });
+
+    if (existingActivity) {
+      return res.status(400).json({
+        message: 'You\'ve already participated in this event! Your activity was recorded on ' + new Date(existingActivity.createdAt).toLocaleDateString() + '. You can scan again to view details.',
+        existingActivity: {
+          id: existingActivity._id,
+          eventTitle: event.title,
+          timestamp: existingActivity.createdAt,
+          rewardAmount: existingActivity.rewardAmount
+        }
+      });
+    }
+    
     const newActivity = new Activity({
       event: event._id,
       qrCode: qrCode._id,
       user: req.user.userId,
       quantity: quantity || event.defaultQuantity || 1,
       notes: notes || '',
+      rewardAmount: event.rewardAmount || 1, // Store the actual reward amount
     });
     
     await newActivity.save();
@@ -39,14 +58,41 @@ exports.recordActivity = async (req, res) => {
       req.user.userId,
       { $push: { activities: newActivity._id } }
     );
+
+    // Activity recorded successfully - user can claim rewards later
     
     res.status(201).json({
-      message: 'Activity recorded successfully',
+      message: qrCode.type === 'volunteer' ? 
+        'Activity recorded successfully! You can now claim your G$ rewards.' : 
+        'Activity recorded successfully',
       activity: newActivity
     });
   } catch (error) {
     console.error('Error recording activity:', error);
-    res.status(500).json({ message: 'Server error' });
+    
+    // Handle specific error types with user-friendly messages
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        message: 'Invalid activity data. Please check your input and try again.' 
+      });
+    }
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({ 
+        message: 'Invalid event or QR code. Please scan again.' 
+      });
+    }
+    
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        message: 'Activity already exists. You have already participated in this event.' 
+      });
+    }
+    
+    // Generic error for unexpected issues
+    res.status(500).json({ 
+      message: 'Unable to record activity. Please try again later.' 
+    });
   }
 };
 
@@ -104,10 +150,29 @@ exports.mintActivityNFT = async (req, res) => {
   } catch (error) {
     console.error('Error minting NFT:', error);
     
+    // Handle specific blockchain errors with user-friendly messages
+    if (error.message && error.message.includes('insufficient funds')) {
+      return res.status(400).json({ 
+        message: 'Insufficient funds for blockchain transaction. Please try again later.' 
+      });
+    }
+    
+    if (error.message && error.message.includes('network')) {
+      return res.status(400).json({ 
+        message: 'Network connection issue. Please check your internet and try again.' 
+      });
+    }
+    
+    if (error.message && error.message.includes('gas')) {
+      return res.status(400).json({ 
+        message: 'Transaction failed due to gas issues. Please try again.' 
+      });
+    }
+    
+    // Generic blockchain error
     res.status(500).json({ 
-      message: 'Blockchain transaction failed',
-      error: error.message,
-      details: error.toString()
+      message: 'Unable to process blockchain transaction. Please try again later.',
+      error: error.message || 'Unknown error'
     });
   }
 };

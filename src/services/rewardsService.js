@@ -1,3 +1,4 @@
+require('dotenv').config();
 /**
  * Rewards service for distributing GoodDollar rewards to nonprofit wallet
  * Integrates with GoodCollective SDK for smart contract interactions
