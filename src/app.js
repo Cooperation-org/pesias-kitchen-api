@@ -15,6 +15,7 @@ const rewardsRoutes = require('./routes/rewards');
 const analyticsRoutes= require('./routes/analytics')
 const walletRoutes = require('./routes/wallet');
 const anonymousScanRoutes = require('./routes/anonymousScan');
+const donationRoutes = require('./routes/donationRoutes');
 
 
 
@@ -52,6 +53,7 @@ app.use('/api/rewards', rewardsRoutes);
 app.use('/api/stats', analyticsRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/anonymous-scan', anonymousScanRoutes);
+app.use('/api/donations', donationRoutes);
 
 
 
