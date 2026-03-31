@@ -35,6 +35,10 @@ const qrCodeSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+  isQuizGenerated: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 module.exports = mongoose.model('QRCode', qrCodeSchema);

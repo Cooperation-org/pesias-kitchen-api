@@ -6,6 +6,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const qrCodeRoutes = require('./routes/qrCode');
+const qrQuizRoutes = require('./routes/qrQuiz');
 const activityRoutes = require('./routes/activity');
 const userRoutes = require('./routes/user');
 const eventRoutes = require('./routes/event');
@@ -51,6 +52,7 @@ app.use('/uploads', express.static('uploads'));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/qr', qrCodeRoutes);
+app.use('/api/qrquiz', qrQuizRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/event', eventRoutes);
