@@ -36,3 +36,9 @@ build/
 
 # Admin scripts with sensitive data
 grant-admin.js
+
+# Mongo DB files
+mongo-data/
+
+# Seeders
+scripts/seedDb/
