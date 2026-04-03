@@ -33,6 +33,8 @@ exports.getNFTDetails = async (req, res) => {
       case 'food_sorting': rewardAmount = 1; break;
       case 'food_distribution': rewardAmount = 2; break;
       case 'food_pickup': rewardAmount = 1.5; break;
+      // learning activity does not mint nft yet; added for future impl
+      case 'learning': rewardAmount = 1; break;
       default: rewardAmount = 1;
     }
     
@@ -52,6 +54,12 @@ exports.getNFTDetails = async (req, res) => {
         title = 'Pickup Specialist';
         heroStatus = 'Pickup Specialist';
         imageUrl = process.env.NFT_IMAGE_URL_PICKUP || process.env.NFT_IMAGE_URL;
+        break;
+      // learning activity does not mint nft yet; added for future impl
+      case 'learning':
+        title = 'Active Learner';
+        heroStatus = 'Active Learner';
+        imageUrl = process.env.NFT_IMAGE_URL;
         break;
       default:
         title = 'Food Rescue Hero';

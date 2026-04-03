@@ -22,9 +22,9 @@ const getMongooseOptions = () => {
     };
   }
 
-  const secureContext = tls.createSecureContext({
-    secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT
-  });
+  // const secureContext = tls.createSecureContext({
+  //   secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT
+  // });
 
   return {
     serverSelectionTimeoutMS: 30000,
@@ -34,8 +34,9 @@ const getMongooseOptions = () => {
     maxPoolSize: 50,
     minPoolSize: 5,
     family: 4,
-    tls: true,
-    secureContext: secureContext
+    // removed for now
+    // tls: true,
+    // secureContext: secureContext
   };
 };
 

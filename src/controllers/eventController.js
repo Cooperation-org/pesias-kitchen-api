@@ -34,6 +34,15 @@ exports.getEventById = async (req, res) => {
   }
 };
 
+exports.getUserLearningEvent = async (req, res) => {
+  try {
+    const event = await Event.find({ participants })
+  } catch (error) {
+    console.error('Error fetching learning event:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
 exports.createEvent = async (req, res) => {
   try {
     const { title, description, location, date, activityType, capacity } = req.body;

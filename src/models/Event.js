@@ -19,7 +19,7 @@ const eventSchema = new mongoose.Schema({
   },
   activityType: {
     type: String,
-    enum: ['food_sorting', 'food_distribution', 'food_pickup'],
+    enum: ['food_sorting', 'food_distribution', 'food_pickup', 'learning'],
     required: true,
   },
   capacity: {
