@@ -83,6 +83,7 @@ exports.getFoodHeroesImpact = async (req, res) => {
         case 'food_sorting': rewardPerActivity = 1; break;
         case 'food_distribution': rewardPerActivity = 2; break;
         case 'food_pickup': rewardPerActivity = 1.5; break;
+        case 'learning': rewardPerActivity = 1; break;
         default: rewardPerActivity = 1;
       }
       
@@ -364,6 +365,7 @@ exports.getSingleEventImpact = async (req, res) => {
           case 'food_sorting': rewardAmount = 1; break;
           case 'food_distribution': rewardAmount = 2; break;
           case 'food_pickup': rewardAmount = 1.5; break;
+          case 'learning': rewardAmount = 1; break;
         }
         totalRewards += rewardAmount;
       }

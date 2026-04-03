@@ -18,6 +18,7 @@ exports.getRewardHistory = async (req, res) => {
         case 'food_sorting': rewardAmount = 1; break;
         case 'food_distribution': rewardAmount = 2; break;
         case 'food_pickup': rewardAmount = 1.5; break;
+        case 'learning': rewardAmount = 1; break;
         default: rewardAmount = 0;
       }
       

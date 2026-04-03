@@ -3,7 +3,11 @@ services:
     image: mongo:7
     container_name: pesias-mongo
     ports:
-      - "27017:27017"
+      - "127.0.0.1:${MONGO_PORT:-29117}:27017"
     volumes:
       - ./mongo-data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    command: ["mongod", "--auth", "--bind_ip_all"]
     restart: unless-stopped

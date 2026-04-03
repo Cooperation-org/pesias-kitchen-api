@@ -42,3 +42,6 @@ mongo-data/
 
 # Seeders
 scripts/seedDb/
+
+# Shell scripts
+*.sh
