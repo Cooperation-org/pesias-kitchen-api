@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Event = require('../models/Event');
 
 exports.getCurrentUser = async (req, res) => {
   try {
@@ -96,6 +97,28 @@ exports.updateUserRole = async (req, res) => {
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (role === 'volunteer') {
+      const existingLearningEvent = await Event.findOne({
+        activityType: 'learning',
+        participants: user._id,
+      });
+
+      if (!existingLearningEvent) {
+        const newLearningEvent = new Event({
+          title: `Learning Event`,
+          description: 'Automatically created for volunteers',
+          location: 'NIL',
+          date: new Date(),
+          activityType: 'learning',
+          capacity: 1,
+          participants: [user._id],
+          createdBy: req.user.userId
+        });
+
+        await newLearningEvent.save();
+      }
     }
     
     res.status(200).json(user);

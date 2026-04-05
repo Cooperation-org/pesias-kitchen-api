@@ -6,6 +6,7 @@ const router = express.Router();
 
 
 router.get('/', authenticate, eventController.getAllEvents);
+router.get('/learning', authenticate, eventController.getUserLearningEvent)
 router.get('/:eventId', authenticate, eventController.getEventById)
 router.post('/', authenticate, checkRole(['admin', 'superadmin']), eventController.createEvent);
 router.put('/:eventId', authenticate, checkRole(['admin', 'superadmin']), eventController.updateEvent);
