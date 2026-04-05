@@ -1,8 +1,9 @@
 const Event = require('../models/Event');
+const User = require('../models/User');
 
 exports.getAllEvents = async (req, res) => {
   try {
-    const events = await Event.find()
+    const events = await Event.find({ activityType: { $ne: 'learning' } })
       .sort({ date: 1 })
       .populate('createdBy', 'name walletAddress')
       .populate('qrCodes.volunteer')
@@ -36,7 +37,31 @@ exports.getEventById = async (req, res) => {
 
 exports.getUserLearningEvent = async (req, res) => {
   try {
-    const event = await Event.find({ participants })
+    const userId = req.user.userId;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const event = await Event.findOne({
+      activityType: 'learning',
+      participants: user._id,
+      $expr: { $eq: [ { $size: '$participants' }, 1 ] }
+    })
+      .populate('createdBy', 'name walletAddress')
+      .populate('participants', 'name walletAddress');
+
+    if (!event) {
+      return res.status(404).json({ message: 'Learning event not found' });
+    }
+
+    res.status(200).json(event);
   } catch (error) {
     console.error('Error fetching learning event:', error);
     res.status(500).json({ message: 'Server error' });

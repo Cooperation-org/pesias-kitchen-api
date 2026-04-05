@@ -177,6 +177,104 @@ exports.mintActivityNFT = async (req, res) => {
   }
 };
 
+exports.mintLearningActivityNFT = async (req, res) => {
+  try {
+    const { eventId, qrCodeId, quantity, notes } = req.body;
+
+    if (!eventId || !qrCodeId) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    const activityReq = {
+      body: {
+        eventId: eventId,
+        qrCodeId: qrCodeId,
+        quantity: quantity,
+        notes: notes
+      },
+      user: req.user
+    };
+    
+    const activityRes = {
+      status: function(statusCode) {
+        this.statusCode = statusCode;
+        return this;
+      },
+      json: function(data) {
+        this.data = data;
+        return this;
+      }
+    };
+    
+    await exports.recordActivity(activityReq, activityRes);
+
+    if (activityRes.statusCode !== 201) {
+      return res.status(activityRes.statusCode).json(activityRes.data);
+    }
+    
+    const newActivity = activityRes.data.activity;
+    
+    const nftReq = {
+      params: { activityId: newActivity._id },
+      user: req.user
+    };
+    
+    const nftRes = {
+      status: function(statusCode) {
+        this.statusCode = statusCode;
+        return this;
+      },
+      json: function(data) {
+        this.data = data;
+        return this;
+      }
+    };
+    
+    await exports.mintActivityNFT(nftReq, nftRes);
+    
+    if (nftRes.statusCode !== 200) {
+      return res.status(nftRes.statusCode).json(nftRes.data);
+    }
+    
+    await User.findByIdAndUpdate(
+      req.user.userId,
+      { $addToSet: { activities: newActivity._id } }
+    );
+    
+    res.status(200).json({
+      message: `Learning activity recorded for wallet - ${newActivity.user.walletAddress} and NFT minted successfully! Thank you for your service.`,
+      activity: newActivity,
+    });
+  } catch (error) {
+    console.error('Error minting Learning NFT:', error);
+    
+    // Handle specific blockchain errors with user-friendly messages
+    if (error.message && error.message.includes('insufficient funds')) {
+      return res.status(400).json({ 
+        message: 'Insufficient funds for blockchain transaction. Please try again later.' 
+      });
+    }
+    
+    if (error.message && error.message.includes('network')) {
+      return res.status(400).json({ 
+        message: 'Network connection issue. Please check your internet and try again.' 
+      });
+    }
+    
+    if (error.message && error.message.includes('gas')) {
+      return res.status(400).json({ 
+        message: 'Transaction failed due to gas issues. Please try again.' 
+      });
+    }
+    
+    // Generic blockchain error
+    res.status(500).json({ 
+      message: 'Unable to process blockchain transaction. Please try again later.',
+      error: error.message || 'Unknown error'
+    });
+  }
+};
+
 exports.getUserActivities = async (req, res) => {
   try {
     const activities = await Activity.find({ user: req.user.userId })

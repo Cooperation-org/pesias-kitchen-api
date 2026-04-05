@@ -16,6 +16,12 @@ router.post(
   activityController.mintActivityNFT
 );
 
+router.post(
+  '/mint-learning',
+  authenticate,
+  activityController.mintLearningActivityNFT
+)
+
 router.get(
   '/user',
   authenticate,
