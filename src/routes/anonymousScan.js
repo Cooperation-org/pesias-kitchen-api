@@ -4,7 +4,7 @@ const Event = require('../models/Event');
 const QRCode = require('../models/QRCode');
 const PseudonymousActivity = require('../models/PseudonymousActivity');
 const { calculateDistance } = require('../utils/geolocation');
-const { mintNFT } = require('../services/goodDollarService');
+const { mintNFT, donateFromPool } = require('../services/goodDollarService');
 
 // Nonprofit wallet address for rewards
 const NONPROFIT_WALLET_ADDRESS = process.env.NONPROFIT_WALLET_ADDRESS;
@@ -240,6 +240,67 @@ router.post('/', async (req, res) => {
 
   } catch (error) {
     console.error('Anonymous scan error:', error);
+    
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * Anonymous donation endpoint - no wallet connection required
+ */
+router.post('/donate', async (req, res) => {
+  try {
+    const { 
+      pseudonymousId,
+      geolocation,
+      poolWallet,
+      pesiaWallet,
+      rewardAmount
+    } = req.body;
+
+    console.log('Anonymous scan request:', {
+      pseudonymousId: pseudonymousId?.substring(0, 8) + '...',
+      hasLocation: !!geolocation
+    });
+
+    // Validate required fields
+    if (!pseudonymousId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required field: pseudonymousId is required'
+      });
+    }
+
+    // Validate pseudonymous ID format (UUID v4)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(pseudonymousId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid pseudonymous ID format'
+      });
+    }
+
+    const donateResult = await donateFromPool(
+      poolWallet,
+      pesiaWallet,
+      rewardAmount
+    );
+
+    // Success response
+    const response = {
+      success: true,
+      message: 'Thank you for your donation!',
+      donateResult
+    };
+
+    res.status(200).json(response);
+
+  } catch (error) {
+    console.error('Anonymous donation error:', error);
     
     res.status(500).json({
       success: false,
