@@ -181,6 +181,33 @@ exports.mintNFT = async (userWallet, activityType, location, quantity, activityI
   }
 };
 
+exports.donateFromPool = async (poolWallet, pesiaWallet, rewardAmount) => {
+  try {
+    const tokenContract = new ethers.Contract(
+      poolWallet,
+      ['function transfer(address to, uint256 amount) returns (bool)'],
+      provider
+    );
+    
+    const tx = await tokenContract.connect(wallet).transfer(
+      pesiaWallet,
+      ethers.utils.parseEther(rewardAmount.toString()),
+      { gasLimit: 300000 }
+    );
+    
+    const receipt = await tx.wait();
+    
+    return {
+      tokenId: null, // No real token ID for G$ transfers
+      txHash: receipt.transactionHash,
+      rewardAmount,
+      fromPool: true
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
 exports.getNFTDetails = async (tokenId) => {
   try {
     const { GoodCollectiveSDK } = await import('@gooddollar/goodcollective-sdk');
