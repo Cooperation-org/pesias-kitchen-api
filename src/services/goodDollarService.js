@@ -4,12 +4,12 @@ const { ethers } = require('ethers');
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const chainId = process.env.CHAIN_ID ? parseInt(process.env.CHAIN_ID) : 42220; // Celo Mainnet
+const g$TokenAddress = '0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A';
 
 exports.mintNFT = async (userWallet, activityType, location, quantity, activityId, additionalMetadata = {}) => {
   try {
     if (activityType === 'learning') {
       const rewardAmount = 1
-      const g$TokenAddress = '0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A';
       const tokenContract = new ethers.Contract(
         g$TokenAddress,
         ['function transfer(address to, uint256 amount) returns (bool)'],
@@ -148,8 +148,7 @@ exports.mintNFT = async (userWallet, activityType, location, quantity, activityI
           case 'learning': rewardAmount = 1; break;
           default: rewardAmount = 1;
         }
-        
-        const g$TokenAddress = '0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A';
+
         const tokenContract = new ethers.Contract(
           g$TokenAddress,
           ['function transfer(address to, uint256 amount) returns (bool)'],
@@ -181,14 +180,14 @@ exports.mintNFT = async (userWallet, activityType, location, quantity, activityI
   }
 };
 
-exports.donateFromPool = async (poolWallet, pesiaWallet, rewardAmount) => {
+exports.donateFromPool = async (pesiaWallet, rewardAmount) => {
   try {
     const tokenContract = new ethers.Contract(
-      poolWallet,
+      g$TokenAddress,
       ['function transfer(address to, uint256 amount) returns (bool)'],
       provider
     );
-    
+
     const tx = await tokenContract.connect(wallet).transfer(
       pesiaWallet,
       ethers.utils.parseEther(rewardAmount.toString()),
@@ -280,8 +279,7 @@ exports.getPoolInfo = async () => {
         const settings = await poolContract.settings().catch(e => {
           throw e;
         });
-        
-        const g$TokenAddress = '0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A';
+
         const tokenContract = new ethers.Contract(
           g$TokenAddress,
           ['function balanceOf(address account) external view returns (uint256)'],

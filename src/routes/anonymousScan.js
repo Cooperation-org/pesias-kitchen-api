@@ -257,7 +257,6 @@ router.post('/donate', async (req, res) => {
     const { 
       pseudonymousId,
       geolocation,
-      poolWallet,
       pesiaWallet,
       rewardAmount
     } = req.body;
@@ -285,7 +284,6 @@ router.post('/donate', async (req, res) => {
     }
 
     const donateResult = await donateFromPool(
-      poolWallet,
       pesiaWallet,
       rewardAmount
     );
@@ -293,7 +291,7 @@ router.post('/donate', async (req, res) => {
     // Success response
     const response = {
       success: true,
-      message: 'Thank you for your donation!',
+      message: 'Thank you for your contribution!',
       donateResult
     };
 
